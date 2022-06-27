@@ -165,10 +165,10 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     if not self.spectrumImageNode or not self.outputArrayNode:
       return
       
-    self.updateOutputArray2()
+    self.updateOutputArray()
     #self.updateChart()
 
-  def updateOutputArray2(self):
+  def updateOutputArray(self):
     # Get the created table node
     tableNode = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLTableNode')
 
@@ -178,11 +178,10 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
       logging.error("Spectrum image is expected to have exactly 2 rows, got {0}".format(numberOfRows))
       return
 
-    # Create arrays of data  
+    """ # Create arrays of data  
     # a = self.outputArrayNode.GetArray()
     # a.SetNumberOfTuples(self.resolution)
     arr = np.zeros([numberOfRows,numberOfPoints])
-
     for row in range(numberOfRows):
       lineSource=vtk.vtkLineSource()
       lineSource.SetPoint1(0,row,0)
@@ -202,18 +201,18 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
 
     # for i in xrange(self.resolution):
       # a.SetComponent(i, 2, 0)
-    self.probedPoints.GetPointData().GetScalars().Modified()
+    self.probedPoints.GetPointData().GetScalars().Modified() """
     
     I = slicer.util.getNode('Image_Image')
     A = slicer.util.arrayFromVolume(I)
     A = np.squeeze(A)
     histogram = np.histogram(A, bins=100)
  
-    # Save results to a new table node
+    # Save results to a new table node: Only one table is being created so this seems to work
     if self.plotChartNode is None:
       tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
     slicer.util.updateTableFromArray(tableNode,histogram)
-    tableNode.GetTable().GetColumn(0).SetName("Count")
+    tableNode.GetTable().GetColumn(0).SetName("Wavelength")
     tableNode.GetTable().GetColumn(1).SetName("Intensity")
     
     # Create plot
@@ -221,8 +220,8 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
       plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " histogram")
     plotSeriesNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotSeriesNode") 
     plotSeriesNode.SetAndObserveTableNodeID(tableNode.GetID())
-    plotSeriesNode.SetXColumnName("Intensity")
-    plotSeriesNode.SetYColumnName("Count")
+    plotSeriesNode.SetXColumnName("Wavelength")
+    plotSeriesNode.SetYColumnName("Intensity")
     plotSeriesNode.SetPlotType(plotSeriesNode.PlotTypeScatterBar)
     plotSeriesNode.SetColor(0, 0.6, 1.0)
     
@@ -232,14 +231,10 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     plotChartNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotChartNode") 
     plotChartNode.AddAndObservePlotSeriesNodeID(plotSeriesNode.GetID())
     plotChartNode.YAxisRangeAutoOff()
-    plotChartNode.SetYAxisRange(0, 500)
+    plotChartNode.SetYAxisRange(0, 5000)
     self.plotChartNode = plotChartNode   
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
-
-
-
-
 
 
   """ def updateOutputArray(self):
@@ -274,7 +269,6 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     # for i in xrange(self.resolution):
       # a.SetComponent(i, 2, 0)
     self.probedPoints.GetPointData().GetScalars().Modified() """
-
 
   # This function is used to create and update the chart node 
   def updateChart(self):
