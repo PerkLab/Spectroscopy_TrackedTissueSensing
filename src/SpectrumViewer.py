@@ -147,7 +147,7 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
   def startPlotting(self, spectrumImageNode, outputArrayNode):
     # Change the layout to one that has a chart.  This created the ChartView
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
-    ln.SetViewArrangement(24)
+    # ln.SetViewArrangement(24)
 
     self.removeObservers()
     self.spectrumImageNode=spectrumImageNode
@@ -168,6 +168,9 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     self.updateOutputArray()
     #self.updateChart()
 
+
+
+
   def updateOutputArray(self):
     # Get the created table node
     tableNode = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLTableNode')
@@ -178,66 +181,49 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
       logging.error("Spectrum image is expected to have exactly 2 rows, got {0}".format(numberOfRows))
       return
 
-    """ # Create arrays of data  
-    # a = self.outputArrayNode.GetArray()
-    # a.SetNumberOfTuples(self.resolution)
-    arr = np.zeros([numberOfRows,numberOfPoints])
-    for row in range(numberOfRows):
-      lineSource=vtk.vtkLineSource()
-      lineSource.SetPoint1(0,row,0)
-      lineSource.SetPoint2(numberOfPoints-1,row,0)
-      lineSource.SetResolution(self.resolution-1)
-      probeFilter=vtk.vtkProbeFilter()
-      probeFilter.SetInputConnection(lineSource.GetOutputPort())
-      if vtk.VTK_MAJOR_VERSION <= 5:
-        probeFilter.SetSource(self.spectrumImageNode.GetImageData())
-      else:
-        probeFilter.SetSourceData(self.spectrumImageNode.GetImageData())
-      probeFilter.Update()
-      self.probedPoints=probeFilter.GetOutput()
-      self.probedPointScalars= self.probedPoints.GetPointData().GetScalars()
-      # for i in xrange(self.resolution):
-        # a.SetComponent(i, row, probedPointScalars.GetTuple(i)[0])
-
-    # for i in xrange(self.resolution):
-      # a.SetComponent(i, 2, 0)
-    self.probedPoints.GetPointData().GetScalars().Modified() """
-    
-    I = slicer.util.getNode('Image_Image')
+    I = slicer.util.getNode('Image_Image') # Update this to grab it from selector
     A = slicer.util.arrayFromVolume(I)
     A = np.squeeze(A)
-    histogram = np.histogram(A, bins=100)
- 
-    # Save results to a new table node: Only one table is being created so this seems to work
+    A = np.transpose(A)
+    # histogram = np.histogram(A, bins=100)
+
+    # Save results to a new table node
     if self.plotChartNode is None:
       tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
-    slicer.util.updateTableFromArray(tableNode,histogram)
+    #slicer.util.updateTableFromArray(tableNode,histogram)
+    slicer.util.updateTableFromArray(tableNode,A)
     tableNode.GetTable().GetColumn(0).SetName("Wavelength")
     tableNode.GetTable().GetColumn(1).SetName("Intensity")
-    
+
     # Create plot
+    # 
     if self.plotChartNode is None:
-      plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " histogram")
+      # plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " histogram")
+      plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " plot")
+      print ('here')
     plotSeriesNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotSeriesNode") 
     plotSeriesNode.SetAndObserveTableNodeID(tableNode.GetID())
     plotSeriesNode.SetXColumnName("Wavelength")
     plotSeriesNode.SetYColumnName("Intensity")
-    plotSeriesNode.SetPlotType(plotSeriesNode.PlotTypeScatterBar)
+    plotSeriesNode.SetPlotType(plotSeriesNode.PlotTypeScatter) # This is where to switch it to Scatter
     plotSeriesNode.SetColor(0, 0.6, 1.0)
-    
+
     # Create chart and add plot
+    # Stop it from creating a plot on every loop
     if self.plotChartNode is None:
       plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
     plotChartNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotChartNode") 
-    plotChartNode.AddAndObservePlotSeriesNodeID(plotSeriesNode.GetID())
+    plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID()) # look for set and observe
     plotChartNode.YAxisRangeAutoOff()
-    plotChartNode.SetYAxisRange(0, 5000)
+    plotChartNode.SetYAxisRange(0, 1)
     self.plotChartNode = plotChartNode   
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
 
 
-  """ def updateOutputArray(self):
+
+
+  """ def updateOutputArray2(self):
    
     numberOfPoints = self.spectrumImageNode.GetImageData().GetDimensions()[0]
     numberOfRows = self.spectrumImageNode.GetImageData().GetDimensions()[1]
@@ -249,6 +235,7 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     # a = self.outputArrayNode.GetArray()
     # a.SetNumberOfTuples(self.resolution)
 
+    #This part appears to be filtering the data and preping it for display. Not sure its purpose
     for row in range(numberOfRows):
       lineSource=vtk.vtkLineSource()
       lineSource.SetPoint1(0,row,0)
@@ -310,7 +297,8 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     
 
     # ******************************************************************************************
-""" # Get the first ChartView node
+""" def updateChart2(self):
+    # Get the first ChartView node
     cvn = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLPlotChartNode') #************
     # cvn = slicer.util.getNode(pattern='vtkMRMLPlotChartNode*')
 
