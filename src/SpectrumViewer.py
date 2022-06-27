@@ -185,15 +185,12 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     A = slicer.util.arrayFromVolume(I)
     A = np.squeeze(A)
     A = np.transpose(A)
-    # histogram = np.histogram(A, bins=100)
 
     # Save results to a new table node
     if self.plotChartNode is None:
       tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
     #slicer.util.updateTableFromArray(tableNode,histogram)
-    slicer.util.updateTableFromArray(tableNode,A)
-    tableNode.GetTable().GetColumn(0).SetName("Wavelength")
-    tableNode.GetTable().GetColumn(1).SetName("Intensity")
+    slicer.util.updateTableFromArray(tableNode,A,["Wavelength","Intensity"])
 
     # Create plot
     # 
@@ -212,10 +209,14 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     # Stop it from creating a plot on every loop
     if self.plotChartNode is None:
       plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
+
+
     plotChartNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotChartNode") 
     plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID()) # look for set and observe
     plotChartNode.YAxisRangeAutoOff()
     plotChartNode.SetYAxisRange(0, 1)
+
+
     self.plotChartNode = plotChartNode   
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
