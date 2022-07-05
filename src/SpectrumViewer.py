@@ -94,8 +94,15 @@ class SpectrumViewerWidget(ScriptedLoadableModuleWidget):
     self.enablePlottingCheckBox.setToolTip("If checked, then the spectrum plot will be updated in real-time")
     parametersFormLayout.addRow("Enable plotting", self.enablePlottingCheckBox)
 
+    # Button to automatically connect to plus server
+    self.connectButton = qt.QPushButton()
+    self.connectButton.text = "Connect"
+    self.connectButton.enabled = True
+    parametersFormLayout.addRow(self.connectButton)
+
     # connections
     self.enablePlottingCheckBox.connect('stateChanged(int)', self.setEnablePlotting)
+    self.connectButton.connect('clicked(bool)', self.onConnectButtonClicked)
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -108,6 +115,25 @@ class SpectrumViewerWidget(ScriptedLoadableModuleWidget):
       self.logic.startPlotting(self.spectrumImageSelector.currentNode(), self.outputArraySelector.currentNode())
     else:
       self.logic.stopPlotting()
+
+
+  def onConnectButtonClicked(self):
+    nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
+    if nodeList == []:
+      connectorNode = slicer.vtkMRMLIGTLConnectorNode()
+      slicer.mrmlScene.AddNode(connectorNode)
+      connectorNode.SetTypeClient('localhost', 18944)
+      connectorNode.Start()
+      self.connectButton.text = 'Disconnect'
+    else:
+      connectorNode = nodeList[0]
+      if connectorNode.GetState() == 0:
+        connectorNode.Start()
+        self.connectButton.text = 'Disconnect'
+        print('test')
+      else:
+        connectorNode.Stop()
+        self.connectButton.text = 'Connect' 
 
 #
 # SpectrumViewerLogic
@@ -148,7 +174,6 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     # Change the layout to one that has a chart.  This created the ChartView
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
     # ln.SetViewArrangement(24)
-
     self.removeObservers()
     self.spectrumImageNode=spectrumImageNode
     self.outputArrayNode=outputArrayNode    
@@ -158,8 +183,8 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     self.onSpectrumImageNodeModified(0,0)
 
   def stopPlotting(self):
-    self.removeObservers()
-  
+    self.removeObservers()  
+
   def onSpectrumImageNodeModified(self, observer, eventid):
   
     if not self.spectrumImageNode or not self.outputArrayNode:
@@ -168,20 +193,20 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     self.updateOutputArray()
     #self.updateChart()
 
-
-
-
   def updateOutputArray(self):
-    # Get the created table node
+    # Get the table created by the selector
     tableNode = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLTableNode')
 
+    # Throw an error if the image has improper dimensions
     numberOfPoints = self.spectrumImageNode.GetImageData().GetDimensions()[0]
     numberOfRows = self.spectrumImageNode.GetImageData().GetDimensions()[1]
     if numberOfRows!=2:
       logging.error("Spectrum image is expected to have exactly 2 rows, got {0}".format(numberOfRows))
       return
 
+    # Get the image from the volume selector
     I = slicer.util.getNode('Image_Image') # Update this to grab it from selector
+    # Convert it to a displayable format
     A = slicer.util.arrayFromVolume(I)
     A = np.squeeze(A)
     A = np.transpose(A)
@@ -193,7 +218,6 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     slicer.util.updateTableFromArray(tableNode,A,["Wavelength","Intensity"])
 
     # Create plot
-    # 
     if self.plotChartNode is None:
       # plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " histogram")
       plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " plot")
@@ -212,50 +236,14 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     plotChartNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotChartNode") 
     plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID()) # look for set and observe
     plotChartNode.YAxisRangeAutoOff()
-    plotChartNode.SetYAxisRange(0, 2)
+    #plotChartNode.SetYAxisRange(0, 2)
 
     self.plotChartNode = plotChartNode   
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
 
 
-
-
-  """ def updateOutputArray2(self):
-   
-    numberOfPoints = self.spectrumImageNode.GetImageData().GetDimensions()[0]
-    numberOfRows = self.spectrumImageNode.GetImageData().GetDimensions()[1]
-    if numberOfRows!=2:
-      logging.error("Spectrum image is expected to have exactly 2 rows, got {0}".format(numberOfRows))
-      return
-
-    # Create arrays of data  
-    # a = self.outputArrayNode.GetArray()
-    # a.SetNumberOfTuples(self.resolution)
-
-    #This part appears to be filtering the data and preping it for display. Not sure its purpose
-    for row in range(numberOfRows):
-      lineSource=vtk.vtkLineSource()
-      lineSource.SetPoint1(0,row,0)
-      lineSource.SetPoint2(numberOfPoints-1,row,0)
-      lineSource.SetResolution(self.resolution-1)
-      probeFilter=vtk.vtkProbeFilter()
-      probeFilter.SetInputConnection(lineSource.GetOutputPort())
-      if vtk.VTK_MAJOR_VERSION <= 5:
-        probeFilter.SetSource(self.spectrumImageNode.GetImageData())
-      else:
-        probeFilter.SetSourceData(self.spectrumImageNode.GetImageData())
-      probeFilter.Update()
-      self.probedPoints=probeFilter.GetOutput()
-      self.probedPointScalars= self.probedPoints.GetPointData().GetScalars()
-      # for i in xrange(self.resolution):
-        # a.SetComponent(i, row, probedPointScalars.GetTuple(i)[0])
-
-    # for i in xrange(self.resolution):
-      # a.SetComponent(i, 2, 0)
-    self.probedPoints.GetPointData().GetScalars().Modified() """
-
-  # This function is used to create and update the chart node 
+  # This function is unused; Purpose is to create and update the chart node 
   def updateChart(self):
     
     # Get the first PlotChart node
@@ -269,16 +257,6 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
       print('in 1')
       name = self.spectrumImageNode.GetName()
       print(name)
-      # print(self.outputArrayNode.GetTable())
-      # I then want to populate the chart using the data from the table
-      """ ChA_ChartNode = slicer.util.plot(np.array([0,0,0,0,0,0,0]), 0)
-
-      layoutManager = slicer.app.layoutManager()
-      layoutWithPlot = slicer.modules.plots.logic().GetLayoutWithPlot(layoutManager.layout)
-      layoutManager.setLayout(layoutWithPlot)
-      plotWidget = layoutManager.plotWidget(0)
-      plotViewNode = plotWidget.mrmlPlotViewNode()
-      plotViewNode.SetPlotChartNodeID(ChA_ChartNode.GetID()) """
 
     # If there isnt one then create one
     if not cn:
@@ -321,8 +299,9 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     # Set the chart to display
     cvn.SetChartNodeID(cn.GetID())
     cvn.Modified() """
-
  
+
+
 class SpectrumViewerTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
