@@ -205,7 +205,8 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
       return
 
     # Get the image from the volume selector
-    I = slicer.util.getNode('Image_Image') # Update this to grab it from selector
+    #I = slicer.util.getNode('Image_Image') # Update this to grab it from selector
+    I = self.spectrumImageNode
     # Convert it to a displayable format
     A = slicer.util.arrayFromVolume(I)
     A = np.squeeze(A)
@@ -221,7 +222,6 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     if self.plotChartNode is None:
       # plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " histogram")
       plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " plot")
-      print ('here')
     plotSeriesNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotSeriesNode") 
     plotSeriesNode.SetAndObserveTableNodeID(tableNode.GetID())
     plotSeriesNode.SetXColumnName("Wavelength")
@@ -235,8 +235,11 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
       plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
     plotChartNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotChartNode") 
     plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID()) # look for set and observe
-    plotChartNode.YAxisRangeAutoOff()
-    #plotChartNode.SetYAxisRange(0, 2)
+    plotChartNode.YAxisRangeAutoOn() # The axes can be set or automatic by toggling between on and off
+    # plotChartNode.SetYAxisRange(0, 2)
+    plotChartNode.SetTitle('Spectrum')
+    plotChartNode.SetXAxisTitle('Wavelength [nm]')
+    plotChartNode.SetYAxisTitle('Intensity [?]')
 
     self.plotChartNode = plotChartNode   
     # Show plot in layout
@@ -254,13 +257,11 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     # If there is one then reuse it
     if self.chartNodeID: # this is None upon initialization
       cn = slicer.mrmlScene.GetNodeByID(pcn.GetID())
-      print('in 1')
       name = self.spectrumImageNode.GetName()
       print(name)
 
     # If there isnt one then create one
     if not cn:
-      print('in 2')
       cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLPlotChartNode())
       self.chartNodeID = cn.GetID()
       # This is broken
