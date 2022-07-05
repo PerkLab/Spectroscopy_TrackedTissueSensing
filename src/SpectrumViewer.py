@@ -209,13 +209,10 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     # Stop it from creating a plot on every loop
     if self.plotChartNode is None:
       plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
-
-
     plotChartNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotChartNode") 
     plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID()) # look for set and observe
     plotChartNode.YAxisRangeAutoOff()
-    plotChartNode.SetYAxisRange(0, 1)
-
+    plotChartNode.SetYAxisRange(0, 2)
 
     self.plotChartNode = plotChartNode   
     # Show plot in layout
