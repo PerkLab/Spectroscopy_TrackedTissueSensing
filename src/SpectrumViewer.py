@@ -197,6 +197,7 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
     self.updateChart()
   
   def updateOutputTable(self):
+    print('test')
     pass
 
   def updateChart(self):
