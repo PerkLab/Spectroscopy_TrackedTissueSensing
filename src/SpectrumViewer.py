@@ -58,6 +58,15 @@ class SpectrumViewerWidget(ScriptedLoadableModuleWidget):
     parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
 
     #
+    # Button to automatically connect to plus server
+    #
+    self.connectButton = qt.QPushButton()
+    self.connectButton.text = "Connect"
+    self.connectButton.enabled = True
+    self.connectButton.setToolTip("Click to connect to the plus server")
+    parametersFormLayout.addRow('Connect to plus server:',self.connectButton)
+
+    #
     # input volume selector
     #
     self.spectrumImageSelector = slicer.qMRMLNodeComboBox()
@@ -94,12 +103,6 @@ class SpectrumViewerWidget(ScriptedLoadableModuleWidget):
     self.enablePlottingCheckBox.setToolTip("If checked, then the spectrum plot will be updated in real-time")
     parametersFormLayout.addRow("Enable plotting", self.enablePlottingCheckBox)
 
-    # Button to automatically connect to plus server
-    self.connectButton = qt.QPushButton()
-    self.connectButton.text = "Connect"
-    self.connectButton.enabled = True
-    parametersFormLayout.addRow(self.connectButton)
-
     # connections
     self.enablePlottingCheckBox.connect('stateChanged(int)', self.setEnablePlotting)
     self.connectButton.connect('clicked(bool)', self.onConnectButtonClicked)
@@ -130,7 +133,6 @@ class SpectrumViewerWidget(ScriptedLoadableModuleWidget):
       if connectorNode.GetState() == 0:
         connectorNode.Start()
         self.connectButton.text = 'Disconnect'
-        print('test')
       else:
         connectorNode.Stop()
         self.connectButton.text = 'Connect' 
@@ -165,15 +167,16 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
       print("Add observer to {0}".format(self.spectrumImageNode.GetName()))
       self.observerTags.append([self.spectrumImageNode, self.spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified)])
 
+  # This function does not work correctly as the plot continues to plot. ***
   def removeObservers(self):
     print("Remove observers")
     for nodeTagPair in self.observerTags:
       nodeTagPair[0].RemoveObserver(nodeTagPair[1])
 
   def startPlotting(self, spectrumImageNode, outputArrayNode):
-    # Change the layout to one that has a chart.  This created the ChartView
+    # Change the layout to one that has a chart.
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
-    # ln.SetViewArrangement(24)
+    ln.SetViewArrangement(24)
     self.removeObservers()
     self.spectrumImageNode=spectrumImageNode
     self.outputArrayNode=outputArrayNode    
@@ -189,11 +192,14 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
   
     if not self.spectrumImageNode or not self.outputArrayNode:
       return
-      
-    self.updateOutputArray()
-    #self.updateChart()
+  
+    self.updateOutputTable()
+    self.updateChart()
+  
+  def updateOutputTable(self):
+    pass
 
-  def updateOutputArray(self):
+  def updateChart(self):
     # Get the table created by the selector
     tableNode = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLTableNode')
 
@@ -205,103 +211,41 @@ class SpectrumViewerLogic(ScriptedLoadableModuleLogic):
       return
 
     # Get the image from the volume selector
-    #I = slicer.util.getNode('Image_Image') # Update this to grab it from selector
-    I = self.spectrumImageNode
+    specIm = self.spectrumImageNode
     # Convert it to a displayable format
-    A = slicer.util.arrayFromVolume(I)
-    A = np.squeeze(A)
-    A = np.transpose(A)
+    specArray = slicer.util.arrayFromVolume(specIm)
+    specArray = np.squeeze(specArray)
+    specArray = np.transpose(specArray)
 
     # Save results to a new table node
-    if self.plotChartNode is None:
+    if slicer.util.getNodesByClass('vtkMRMLTableNode') == []:
       tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
-    #slicer.util.updateTableFromArray(tableNode,histogram)
-    slicer.util.updateTableFromArray(tableNode,A,["Wavelength","Intensity"])
+    slicer.util.updateTableFromArray(tableNode,specArray,["Wavelength","Intensity"])
 
     # Create plot
-    if self.plotChartNode is None:
-      # plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " histogram")
-      plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", I.GetName() + " plot")
+    if slicer.util.getNodesByClass('vtkMRMLPlotSeriesNode') == []:
+      plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", specIm.GetName() + " plot")
     plotSeriesNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotSeriesNode") 
     plotSeriesNode.SetAndObserveTableNodeID(tableNode.GetID())
     plotSeriesNode.SetXColumnName("Wavelength")
     plotSeriesNode.SetYColumnName("Intensity")
-    plotSeriesNode.SetPlotType(plotSeriesNode.PlotTypeScatter) # This is where to switch it to Scatter
+    plotSeriesNode.SetPlotType(plotSeriesNode.PlotTypeScatter)
     plotSeriesNode.SetColor(0, 0.6, 1.0)
 
     # Create chart and add plot
-    # Stop it from creating a plot on every loop
-    if self.plotChartNode is None:
+    if slicer.util.getNodesByClass('vtkMRMLPlotChartNode') == []:
       plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
     plotChartNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotChartNode") 
-    plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID()) # look for set and observe
+    plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID())
     plotChartNode.YAxisRangeAutoOn() # The axes can be set or automatic by toggling between on and off
     # plotChartNode.SetYAxisRange(0, 2)
     plotChartNode.SetTitle('Spectrum')
     plotChartNode.SetXAxisTitle('Wavelength [nm]')
-    plotChartNode.SetYAxisTitle('Intensity [?]')
+    plotChartNode.SetYAxisTitle('Intensity')
+    self.plotChartNode = plotChartNode 
 
-    self.plotChartNode = plotChartNode   
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
-
-
-  # This function is unused; Purpose is to create and update the chart node 
-  def updateChart(self):
-    
-    # Get the first PlotChart node
-    pcn = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLPlotChartNode')
-    
-    # If we already created a chart node and it still exists then reuse that node
-    cn = None
-    # If there is one then reuse it
-    if self.chartNodeID: # this is None upon initialization
-      cn = slicer.mrmlScene.GetNodeByID(pcn.GetID())
-      name = self.spectrumImageNode.GetName()
-      print(name)
-
-    # If there isnt one then create one
-    if not cn:
-      cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLPlotChartNode())
-      self.chartNodeID = cn.GetID()
-      # This is broken
-      # Configure properties of the Chart - GetPlotDataNodeReferenceRole() in doc shows list of attribute to change
-      """ cn.SetProperty('default', 'title', 'Spectrum')
-      cn.SetProperty('default', 'xAxisLabel', 'Wavelength (nm)')
-      cn.SetProperty('default', 'yAxisLabel', 'Intensity') """
-
-    # Now I need to get the chart to pop up
-    
-
-    # ******************************************************************************************
-""" def updateChart2(self):
-    # Get the first ChartView node
-    cvn = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLPlotChartNode') #************
-    # cvn = slicer.util.getNode(pattern='vtkMRMLPlotChartNode*')
-
-    # If we already created a chart node and it is still exists then reuse that
-    cn = None
-    if self.chartNodeID:
-      cn = slicer.mrmlScene.GetNodeByID(cvn.GetID())
-      # cn = slicer.mrmlScene.GetNodeByID(cvn.GetChartNodeID()) # GetChartNodeID is depreciated
-    if not cn:
-      cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLPlotChartNode()) # ***************
-      self.chartNodeID = cn.GetID()
-      # Configure properties of the Chart
-      cn.SetProperty('default', 'title', 'Spectrum')
-      cn.SetProperty('default', 'xAxisLabel', 'Wavelength (nm)')
-      cn.SetProperty('default', 'yAxisLabel', 'Intensity')  
-    
-    name = self.spectrumImageNode.GetName()
-
-    # ** This is no longer an array, now it is a table
-    cn.AddArray(name, self.outputArrayNode.GetID())
-    
-    # Set the chart to display
-    cvn.SetChartNodeID(cn.GetID())
-    cvn.Modified() """
- 
-
 
 class SpectrumViewerTest(ScriptedLoadableModuleTest):
   """
