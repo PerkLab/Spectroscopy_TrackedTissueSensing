@@ -30,7 +30,7 @@ def add(a,b):
     return ans
 
 # This function combines loading the data with 
-def loadDataset(datapath,numfiles):
+def loadDataset(datapath,numfiles,start_index=742,end_index=-1,sep=';'):
     Dataset = []
     for i in range(numfiles):
         # Loading in the data
@@ -39,11 +39,11 @@ def loadDataset(datapath,numfiles):
         else:
             numAsString + str(i+1)
         filename = datapath + numAsString + '.csv'    
-        df = pd.read_csv(filename, sep=';',engine='python')
+        df = pd.read_csv(filename, sep=sep,engine='python')
         # Extracting Relvant information
         # 32 for start, 774 for 350 nm
 #         data = df[32:-1] # ** flag
-        data = df[774:-1]
+        data = df[start_index:end_index]
         
         data_arr = data.to_numpy()
         Dataset.append(data_arr)
@@ -57,4 +57,6 @@ def loadSpectrum(path, name, col_name=None,start_index=774,end_index=-1,sep=';')
     if not(col_name == None):
         df[col_name] = df.index
     data = df[start_index:end_index]
-    return data
+    data_arr = data.to_numpy()
+    data_arr = np.array(data_arr,dtype='float')
+    return data_arr

@@ -19,13 +19,15 @@ from scipy import interpolate
 # Normalize peak instensity to 1.0
 def normalize(data):
     temp = data.copy()
-    if len(temp) > 1000:
-        temp = (temp - min(temp))
-        temp = temp/max(temp)
-    else:
+    if len(temp.shape) == 2:
+        temp[:,1] = (temp[:,1] - min(temp[:,1]))
+        temp[:,1] = temp[:,1]/max(temp[:,1])
+    elif len(temp.shape) == 3:
         for i in range(len(temp)):
-            temp[i] = (temp[i] - min(temp[i]))
-            temp[i] = temp[i]/max(temp[i])
+            temp[i,:,1] = (temp[i,:,1] - min(temp[i,:,1]))
+            temp[i,:,1] = temp[i,:,1]/max(temp[i,:,1])
+    else:
+        print('Error, array dimension is not 2 or 3')     
     return temp
  
 def subtractBaseline(data,baseline):
