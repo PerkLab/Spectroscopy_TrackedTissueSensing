@@ -3,7 +3,8 @@ import unittest
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import numpy as np
-
+from joblib import dump, load
+import sklearn
 #
 # BroadSpecModule
 #
@@ -199,6 +200,18 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
   def updateOutputTable(self):
     pass
 
+
+  def classifySpectra(self,X_test):
+    # Load in the model (This will get loaded in every iteration which is not good)
+    path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
+    filename = "KNN_TestModel.joblib" 
+    model = load(path+filename)
+    # print(X_test.shape)
+    X_test = X_test.reshape(1,-1)
+    # print(X_test.shape)
+    predicted = model.predict(X_test)
+    return predicted
+
   def updateChart(self):
     # Get the table created by the selector
     tableNode = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLTableNode')
@@ -216,6 +229,11 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
     specArray = slicer.util.arrayFromVolume(specIm)
     specArray = np.squeeze(specArray)
     specArray = np.transpose(specArray)
+ 
+    #
+    # Load in and classify the spectra using the model
+    #
+    specLabel = self.classifySpectra(specArray[743:-1,1])
 
     # Save results to a new table node
     if slicer.util.getNodesByClass('vtkMRMLTableNode') == []:
@@ -239,7 +257,8 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
     plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID())
     plotChartNode.YAxisRangeAutoOn() # The axes can be set or automatic by toggling between on and off
     # plotChartNode.SetYAxisRange(0, 2)
-    plotChartNode.SetTitle('Spectrum')
+    # plotChartNode.SetTitle('Spectrum')
+    plotChartNode.SetTitle(str(specLabel))
     plotChartNode.SetXAxisTitle('Wavelength [nm]')
     plotChartNode.SetYAxisTitle('Intensity')
     self.plotChartNode = plotChartNode 
