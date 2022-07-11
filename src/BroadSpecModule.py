@@ -162,6 +162,11 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
     self.resolution = 100
     slicer.mymodLog = self
     self.plotChartNode = None 
+    # ###
+    path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
+    filename = "KNN_TestModel.joblib" 
+    self.model = load(path+filename)
+    # ###
 
   def addObservers(self):
     if self.spectrumImageNode:
@@ -203,14 +208,16 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
 
   def classifySpectra(self,X_test):
     # Load in the model (This will get loaded in every iteration which is not good)
-    path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
-    filename = "KNN_TestModel.joblib" 
-    model = load(path+filename)
-    # print(X_test.shape)
+    # path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
+    # filename = "KNN_TestModel.joblib" 
+    # model = load(path+filename)
     X_test = X_test.reshape(1,-1)
-    # print(X_test.shape)
-    predicted = model.predict(X_test)
-    return predicted
+    predicted = self.model.predict(X_test)
+    if predicted[0] == 0:
+      label = 'Table'
+    elif predicted[0] == 1:
+      label = 'Cork'
+    return predicted, label
 
   def updateChart(self):
     # Get the table created by the selector
@@ -233,7 +240,7 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
     #
     # Load in and classify the spectra using the model
     #
-    specLabel = self.classifySpectra(specArray[743:-1,1])
+    specPred, specLabel = self.classifySpectra(specArray[743:-1,1]) # Magic Number **
 
     # Save results to a new table node
     if slicer.util.getNodesByClass('vtkMRMLTableNode') == []:
