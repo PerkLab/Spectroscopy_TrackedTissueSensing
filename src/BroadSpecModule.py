@@ -5,6 +5,7 @@ from slicer.ScriptedLoadableModule import *
 import numpy as np
 from joblib import dump, load
 import sklearn
+
 #
 # BroadSpecModule
 #
@@ -17,7 +18,7 @@ class BroadSpecModule(ScriptedLoadableModule):
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "BroadSpecModule" # TODO make this more human readable by adding spaces
-    self.parent.categories = ["IGT"]
+    self.parent.categories = ["Broadband"]
     self.parent.dependencies = []
     parent.contributors = ["David Morton (Queen's University, PERK Lab)"] 
     self.parent.helpText = """
@@ -85,16 +86,16 @@ class BroadSpecModuleWidget(ScriptedLoadableModuleWidget):
     #
     # output array selector
     #
-    self.outputArraySelector = slicer.qMRMLNodeComboBox()
-    self.outputArraySelector.nodeTypes = ( ("vtkMRMLTableNode"), "" ) # https://slicer.readthedocs.io/en/latest/developer_guide/mrml_overview.html
-    self.outputArraySelector.addEnabled = True
-    self.outputArraySelector.removeEnabled = True
-    self.outputArraySelector.noneEnabled = False 
-    self.outputArraySelector.showHidden = False
-    self.outputArraySelector.showChildNodeTypes = False
-    self.outputArraySelector.setMRMLScene( slicer.mrmlScene )
-    self.outputArraySelector.setToolTip( "Pick the output to the algorithm." )
-    parametersFormLayout.addRow("Output spectrum Table: ", self.outputArraySelector)
+    self.outputTableSelector = slicer.qMRMLNodeComboBox()
+    self.outputTableSelector.nodeTypes = ( ("vtkMRMLTableNode"), "" ) # https://slicer.readthedocs.io/en/latest/developer_guide/mrml_overview.html
+    self.outputTableSelector.addEnabled = True
+    self.outputTableSelector.removeEnabled = True
+    self.outputTableSelector.noneEnabled = False 
+    self.outputTableSelector.showHidden = False
+    self.outputTableSelector.showChildNodeTypes = False
+    self.outputTableSelector.setMRMLScene( slicer.mrmlScene )
+    self.outputTableSelector.setToolTip( "Pick the output to the algorithm." )
+    parametersFormLayout.addRow("Output spectrum Table: ", self.outputTableSelector)
    
     #
     # check box to trigger taking screen shots for later use in tutorials
@@ -116,10 +117,9 @@ class BroadSpecModuleWidget(ScriptedLoadableModuleWidget):
     
   def setEnablePlotting(self, enable):
     if enable:
-      self.logic.startPlotting(self.spectrumImageSelector.currentNode(), self.outputArraySelector.currentNode())
+      self.logic.startPlotting(self.spectrumImageSelector.currentNode(), self.outputTableSelector.currentNode())
     else:
       self.logic.stopPlotting()
-
 
   def onConnectButtonClicked(self):
     nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
@@ -158,7 +158,7 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
     self.chartNodeID = None
     self.spectrumImageNode = None
     self.observerTags = []
-    self.outputArrayNode = None
+    self.outputTableNode = None
     self.resolution = 100
     slicer.mymodLog = self
     self.plotChartNode = None 
@@ -179,14 +179,13 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
     for nodeTagPair in self.observerTags:
       nodeTagPair[0].RemoveObserver(nodeTagPair[1])
 
-  def startPlotting(self, spectrumImageNode, outputArrayNode):
+  def startPlotting(self, spectrumImageNode, outputTableNode):
     # Change the layout to one that has a chart.
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
     ln.SetViewArrangement(24)
     self.removeObservers()
     self.spectrumImageNode=spectrumImageNode
-    self.outputArrayNode=outputArrayNode    
-
+    self.outputTableNode=outputTableNode    
 
     # Start the updates
     self.addObservers()
@@ -197,7 +196,7 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
 
   def onSpectrumImageNodeModified(self, observer, eventid):
   
-    if not self.spectrumImageNode or not self.outputArrayNode:
+    if not self.spectrumImageNode or not self.outputTableNode:
       return
   
     self.updateOutputTable()
