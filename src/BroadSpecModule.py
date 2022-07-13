@@ -187,6 +187,7 @@ class BroadSpecModuleLogic(ScriptedLoadableModuleLogic):
     self.spectrumImageNode=spectrumImageNode
     self.outputArrayNode=outputArrayNode    
 
+
     # Start the updates
     self.addObservers()
     self.onSpectrumImageNodeModified(0,0)
