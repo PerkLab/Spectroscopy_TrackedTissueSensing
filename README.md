@@ -4,7 +4,7 @@
 - Split my code into the various processing steps rather than having everything in one document
 
 ### // Summary //
-This repo is where all of the code is stored for the Broadband Optical Spectroscopy will be stored including preprocessing, algorithms, and slicer modules.
+This repo is where all of the code is stored for the Broadband Optical Spectroscopy including preprocessing, algorithms, and slicer modules.
 
 The overall goal of this project is to create a prototype for a system which uses a tracked optical probe and a broadband lightsource to intraoperatively detect tissue types via a machine learning classifier.
 
