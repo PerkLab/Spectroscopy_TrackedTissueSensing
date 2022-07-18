@@ -1,26 +1,65 @@
-# Create a fiducial node of a certain name. This node can then be populated with control points
-node_id = slicer.modules.markups.logic().AddNewFiducialNode('nodeList')
-# self.markup_node = slicer.mrmlScene.GetNodeByID(node_id) # Self used when in module
-nodeList = slicer.mrmlScene.GetNodeByID(node_id)
-# To get a node from the scene
-nodeList = slicer.util.getNode('nodeList')
-# Adding a node to the scene
-nodeList.AddControlPoint([0, 0, 0])
-# Changing the color of a node
-nodeList.GetDisplayNode().SetSelectedColor(0.3,0.6,0.1) # makes it green for healthy points
-# Change visibiility of the points
-nodeList.SetNthControlPointVisibility(0,True)
-
-
-#
+'''
 # TODO
+- Turn off labels of control points
+- Transform data to a different reference frame (Use Liv's code )
+- 
+'''
+
+
+
+#
+# Control Points
 #
 
-# Turn off labels of control points
+# Create a fiducial node of a certain name. This node can then be populated with control points
+node_id = slicer.modules.markups.logic().AddNewFiducialNode('pointList')
+# self.markup_node = slicer.mrmlScene.GetNodeByID(node_id) # Self used when in module
+pointList = slicer.mrmlScene.GetNodeByID(node_id)
+# To get a node from the scene
+pointList = slicer.util.getNode('nodeList')
+# Adding a node to the scene
+pointList.AddControlPoint([0, 0, 0])
+# Changing the color of a node
+pointList.GetDisplayNode().SetSelectedColor(0.3,0.6,0.1) # makes it green for healthy points
+# Change visibiility of the points
+pointList.SetNthControlPointVisibility(0,True)
+#Change the position and orientation of a previously make control point
+pointList.SetNthControlPointPositionFromArray(0,np.array([0,0,0]))
 
-# Transform data to a different reference frame (Use Liv's code )
+#
+# Transforms
+#
+
+pointList.SetAndObserveTransformNodeID(transform_EMTtoScene.GetID())
 
 
+#
+# Other Code Snippets
+#
+set 
+# Liv's Code
+for i in range(probeTip.GetNumberOfMarkups()):
+      # get point position
+      pos = np.zeros(3)
+      probeTip.GetNthFiducialPosition(i,pos)
+
+      # get and apply probe transforms to point position in retractor coordinates
+      probeModelToProbeNode = slicer.util.getNode("probeModelToProbe")
+      probeModelToProbeMatrix = probeModelToProbeNode.GetMatrixTransformToParent()
+      pos = probeModelToProbeMatrix.MultiplyPoint(np.append(pos,1))
+
+      ProbeToRetractorNode = slicer.util.getNode("ProbeToRetractor")
+      ProbeToRetractorMatrix = ProbeToRetractorNode.GetMatrixTransformToParent()
+      pos = ProbeToRetractorMatrix.MultiplyPoint(pos)
+
+      # add point to output point list
+      n = outputPoints.AddControlPoint(pos[:3])
+      #outputPoints.SetNthControlPointLabel(n, str(self.num))
+      outputPoints.SetNthControlPointLabel(n, "")
+      # set the visibility flag
+      outputPoints.SetNthControlPointVisibility(n, 1)
+
+      return outputPoints
 
 def initialize_points(self):
    slicer.modules.markups.logic().SetActiveListID(self.markup_node)

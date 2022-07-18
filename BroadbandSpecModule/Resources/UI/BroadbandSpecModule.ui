@@ -114,6 +114,16 @@
     </widget>
    </item>
    <item>
+    <widget class="ctkPathLineEdit" name="PathLineEdit"/>
+   </item>
+   <item>
+    <widget class="QPushButton" name="addControlPoint">
+     <property name="text">
+      <string>Add Control Point at Tool Tip</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Vertical</enum>
@@ -134,6 +144,11 @@
    <extends>QWidget</extends>
    <header>ctkCollapsibleButton.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ctkPathLineEdit</class>
+   <extends>QWidget</extends>
+   <header>ctkPathLineEdit.h</header>
   </customwidget>
   <customwidget>
    <class>qMRMLNodeComboBox</class>

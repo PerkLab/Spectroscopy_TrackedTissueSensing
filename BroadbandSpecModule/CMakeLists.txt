@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-set(MODULE_NAME BroadbandSpec_test)
+set(MODULE_NAME BroadbandSpecModule)
 
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS

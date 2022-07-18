@@ -12,17 +12,17 @@ from joblib import dump, load
 import sklearn
 
 #
-# BroadbandSpec_test
+# BroadbandSpecModule
 #
 
-class BroadbandSpec_test(ScriptedLoadableModule):
+class BroadbandSpecModule(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
-    self.parent.title = "BroadbandSpec_test"  # TODO: make this more human readable by adding spaces
+    self.parent.title = "BroadbandSpecModule"  # TODO: make this more human readable by adding spaces
     self.parent.categories = ["Broadband"]
     self.parent.dependencies = []
     parent.contributors = ["David Morton (Queen's University, PERK Lab)"] 
@@ -36,10 +36,10 @@ class BroadbandSpec_test(ScriptedLoadableModule):
     """
 
 #
-# BroadbandSpec_testWidget
+# BroadbandSpecModuleWidget
 #
 
-class BroadbandSpec_testWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   """Uses ScriptedLoadableModuleWidget base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
@@ -61,7 +61,7 @@ class BroadbandSpec_testWidget(ScriptedLoadableModuleWidget, VTKObservationMixin
 
     # Load widget from .ui file (created by Qt Designer).
     # Additional widgets can be instantiated manually and added to self.layout.
-    uiWidget = slicer.util.loadUI(self.resourcePath('UI/BroadbandSpec_test.ui'))
+    uiWidget = slicer.util.loadUI(self.resourcePath('UI/BroadbandSpecModule.ui'))
     self.layout.addWidget(uiWidget)
     self.ui = slicer.util.childWidgetVariables(uiWidget)
 
@@ -72,7 +72,7 @@ class BroadbandSpec_testWidget(ScriptedLoadableModuleWidget, VTKObservationMixin
 
     # Create logic class. Logic implements all computations that should be possible to run
     # in batch mode, without a graphical user interface.
-    self.logic = BroadbandSpec_testLogic()
+    self.logic = BroadbandSpecModuleLogic()
 
     # Connections
 
@@ -83,13 +83,35 @@ class BroadbandSpec_testWidget(ScriptedLoadableModuleWidget, VTKObservationMixin
     # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
     # (in the selected parameter node).
     self.ui.connectButton.connect('clicked(bool)', self.onConnectButtonClicked)
-    self.ui.spectrumImageSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-    self.ui.outputTableSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+    #self.ui.spectrumImageSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+    #self.ui.outputTableSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
     self.ui.enablePlottingCheckBox.connect('stateChanged(int)', self.setEnablePlotting)
+    self.ui.addControlPoint.connect('clicked(bool)', self.onaddControlPointButtonClicked)
 
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
 
+
+  def onaddControlPointButtonClicked(self):
+    '''  
+    # Get the required nodes
+    - EMT transform
+    - pointList
+    '''
+    EMT2World = slicer.util.getNode('pseudoEMT')
+    pointList_World = slicer.util.getNode('pointList_World')
+    print('Adding control point')
+    # Get the current position of the EMT origin. This is just the translational component of the transform
+    EMT2WorldMat = EMT2World.GetMatrixTransformToParent()
+    tip_World = EMT2WorldMat.MultiplyPoint(np.array([0,0,0,1]))
+    tip_World = tip_World[:-1]
+    # Create a Control Point at the position
+    pointList_World.AddControlPoint(tip_World)
+    # I also want to set the colour according to the current classification
+    
+    pass
+  
+  
   def cleanup(self):
     """
     Called when the application closes and the module widget is destroyed.
@@ -206,7 +228,7 @@ class BroadbandSpec_testWidget(ScriptedLoadableModuleWidget, VTKObservationMixin
 
     self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.spectrumImageSelector.currentNodeID)
     self._parameterNode.SetNodeReferenceID("OutputVolume", self.ui.outputTableSelector.currentNodeID)
-
+    
     self._parameterNode.EndModify(wasModified)
 
   # Start of my functions
@@ -234,10 +256,10 @@ class BroadbandSpec_testWidget(ScriptedLoadableModuleWidget, VTKObservationMixin
         self.ui.connectButton.text = 'Connect' 
 
 #
-# BroadbandSpec_testLogic
+# BroadbandSpecModuleLogic
 #
 
-class BroadbandSpec_testLogic(ScriptedLoadableModuleLogic):
+class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
   """This class should implement all the actual
   computation done by your module.  The interface
   should be such that other python code can import
@@ -343,16 +365,28 @@ class BroadbandSpec_testLogic(ScriptedLoadableModuleLogic):
   
   def updateOutputTable(self):
     pass
+  
+  # Normalize peak instensity to 1.0
+  def normalize(self,data):
+    temp = data.copy()
+    if len(temp.shape) == 2:
+        temp[:,1] = (temp[:,1] - min(temp[:,1]))
+        temp[:,1] = temp[:,1]/max(temp[:,1])
+    elif len(temp.shape) == 3:
+        for i in range(len(temp)):
+            temp[i,:,1] = (temp[i,:,1] - min(temp[i,:,1]))
+            temp[i,:,1] = temp[i,:,1]/max(temp[i,:,1])
+    else:
+        print('Error, array dimension is not 2 or 3')     
+    return temp
 
   def classifySpectra(self,X_test):
     # Load in the model (This will get loaded in every iteration which is not good)
-    # path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
-    # filename = "KNN_TestModel.joblib" 
-    # model = load(path+filename)
-    X_test = X_test.reshape(1,-1)
+    #X_test = self.normalize(X_test)
+    X_test = X_test[:,1].reshape(1,-1)
     predicted = self.model.predict(X_test)
     if predicted[0] == 0:
-      label = 'Table'
+      label = 'Desk'
     elif predicted[0] == 1:
       label = 'Cork'
     return predicted, label
@@ -376,9 +410,9 @@ class BroadbandSpec_testLogic(ScriptedLoadableModuleLogic):
     specArray = np.transpose(specArray)
  
     #
-    # Load in and classify the spectra using the model
+    # Load in and classify the spectra using the model. This should be passed in as a parameter
     #
-    specPred, specLabel = self.classifySpectra(specArray[743:-1,1]) # Magic Number **
+    specPred, specLabel = self.classifySpectra(specArray[743:-1,:]) # Magic Number **
 
     # Save results to a new table node
     if slicer.util.getNodesByClass('vtkMRMLTableNode') == []:
@@ -411,11 +445,14 @@ class BroadbandSpec_testLogic(ScriptedLoadableModuleLogic):
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
 
+  def addControlPointToTip(self):
+    pass
+
 #
-# BroadbandSpec_testTest
+# BroadbandSpecModuleTest
 #
 
-class BroadbandSpec_testTest(ScriptedLoadableModuleTest):
+class BroadbandSpecModuleTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
   Uses ScriptedLoadableModuleTest base class, available at:
@@ -431,9 +468,9 @@ class BroadbandSpec_testTest(ScriptedLoadableModuleTest):
     """Run as few or as many tests as needed here.
     """
     self.setUp()
-    self.test_BroadbandSpec_test1()
+    self.test_BroadbandSpecModule1()
 
-  def test_BroadbandSpec_test1(self):
+  def test_BroadbandSpecModule1(self):
     """ Ideally you should have several levels of tests.  At the lowest level
     tests should exercise the functionality of the logic with different inputs
     (both valid and invalid).  At higher levels your tests should emulate the
@@ -451,7 +488,7 @@ class BroadbandSpec_testTest(ScriptedLoadableModuleTest):
 
     import SampleData
     registerSampleData()
-    inputVolume = SampleData.downloadSample('BroadbandSpec_test1')
+    inputVolume = SampleData.downloadSample('BroadbandSpecModule1')
     self.delayDisplay('Loaded test data set')
 
     inputScalarRange = inputVolume.GetImageData().GetScalarRange()
@@ -463,7 +500,7 @@ class BroadbandSpec_testTest(ScriptedLoadableModuleTest):
 
     # Test the module logic
 
-    logic = BroadbandSpec_testLogic()
+    logic = BroadbandSpecModuleLogic()
 
     # Test algorithm with non-inverted threshold
     logic.process(inputVolume, outputVolume, threshold, True)
