@@ -91,7 +91,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
 
-
+  # My functions 
   def onaddControlPointButtonClicked(self):
     '''  
     # Get the required nodes
@@ -111,57 +111,31 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     
     pass
   
+  def setEnablePlotting(self, enable):
+    if enable:
+      self.logic.startPlotting(self.ui.spectrumImageSelector.currentNode(), self.ui.outputTableSelector.currentNode())
+    else:
+      self.logic.stopPlotting()
+
+  def onConnectButtonClicked(self):
+    nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
+    if nodeList == []:
+      connectorNode = slicer.vtkMRMLIGTLConnectorNode()
+      slicer.mrmlScene.AddNode(connectorNode)
+      connectorNode.SetTypeClient('localhost', 18944)
+      connectorNode.Start()
+      self.ui.connectButton.text = 'Disconnect'
+    else:
+      connectorNode = nodeList[0]
+      if connectorNode.GetState() == 0:
+        connectorNode.Start()
+        self.ui.connectButton.text = 'Disconnect'
+      else:
+        connectorNode.Stop()
+        self.ui.connectButton.text = 'Connect' 
+
+  # Predefined functions
   
-  def cleanup(self):
-    """
-    Called when the application closes and the module widget is destroyed.
-    """
-    self.removeObservers()
-  
-  def enter(self):
-    """
-    Called each time the user opens this module.
-    """
-    # Make sure parameter node exists and observed
-    self.initializeParameterNode()
-
-  def exit(self):
-    """
-    Called each time the user opens a different module.
-    """
-    # Do not react to parameter node changes (GUI wlil be updated when the user enters into the module)
-    self.removeObserver(self._parameterNode, vtk.vtkCommand.ModifiedEvent, self.updateGUIFromParameterNode)
-
-  def onSceneStartClose(self, caller, event):
-    """
-    Called just before the scene is closed.
-    """
-    # Parameter node will be reset, do not use it anymore
-    self.setParameterNode(None)
-
-  def onSceneEndClose(self, caller, event):
-    """
-    Called just after the scene is closed.
-    """
-    # If this module is shown while the scene is closed then recreate a new parameter node immediately
-    if self.parent.isEntered:
-      self.initializeParameterNode()
-
-  def initializeParameterNode(self):
-    """
-    Ensure parameter node exists and observed.
-    """
-    # Parameter node stores all user choices in parameter values, node selections, etc.
-    # so that when the scene is saved and reloaded, these settings are restored.
-
-    self.setParameterNode(self.logic.getParameterNode())
-
-    # Select default input nodes if nothing is selected yet to save a few clicks for the user
-    if not self._parameterNode.GetNodeReference("InputVolume"):
-      firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
-      if firstVolumeNode:
-        self._parameterNode.SetNodeReferenceID("InputVolume", firstVolumeNode.GetID())
-
   def setParameterNode(self, inputParameterNode):
     """
     Set and observe parameter node.
@@ -230,30 +204,57 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self._parameterNode.SetNodeReferenceID("OutputVolume", self.ui.outputTableSelector.currentNodeID)
     
     self._parameterNode.EndModify(wasModified)
+ 
+  def cleanup(self):
+    """
+    Called when the application closes and the module widget is destroyed.
+    """
+    self.removeObservers()
+  
+  def enter(self):
+    """
+    Called each time the user opens this module.
+    """
+    # Make sure parameter node exists and observed
+    self.initializeParameterNode()
 
-  # Start of my functions
-  def setEnablePlotting(self, enable):
-    if enable:
-      self.logic.startPlotting(self.ui.spectrumImageSelector.currentNode(), self.ui.outputTableSelector.currentNode())
-    else:
-      self.logic.stopPlotting()
+  def exit(self):
+    """
+    Called each time the user opens a different module.
+    """
+    # Do not react to parameter node changes (GUI wlil be updated when the user enters into the module)
+    self.removeObserver(self._parameterNode, vtk.vtkCommand.ModifiedEvent, self.updateGUIFromParameterNode)
 
-  def onConnectButtonClicked(self):
-    nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
-    if nodeList == []:
-      connectorNode = slicer.vtkMRMLIGTLConnectorNode()
-      slicer.mrmlScene.AddNode(connectorNode)
-      connectorNode.SetTypeClient('localhost', 18944)
-      connectorNode.Start()
-      self.ui.connectButton.text = 'Disconnect'
-    else:
-      connectorNode = nodeList[0]
-      if connectorNode.GetState() == 0:
-        connectorNode.Start()
-        self.ui.connectButton.text = 'Disconnect'
-      else:
-        connectorNode.Stop()
-        self.ui.connectButton.text = 'Connect' 
+  def onSceneStartClose(self, caller, event):
+    """
+    Called just before the scene is closed.
+    """
+    # Parameter node will be reset, do not use it anymore
+    self.setParameterNode(None)
+
+  def onSceneEndClose(self, caller, event):
+    """
+    Called just after the scene is closed.
+    """
+    # If this module is shown while the scene is closed then recreate a new parameter node immediately
+    if self.parent.isEntered:
+      self.initializeParameterNode()
+
+  def initializeParameterNode(self):
+    """
+    Ensure parameter node exists and observed.
+    """
+    # Parameter node stores all user choices in parameter values, node selections, etc.
+    # so that when the scene is saved and reloaded, these settings are restored.
+
+    self.setParameterNode(self.logic.getParameterNode())
+
+    # Select default input nodes if nothing is selected yet to save a few clicks for the user
+    if not self._parameterNode.GetNodeReference("InputVolume"):
+      firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
+      if firstVolumeNode:
+        self._parameterNode.SetNodeReferenceID("InputVolume", firstVolumeNode.GetID())
+
 
 #
 # BroadbandSpecModuleLogic
@@ -285,7 +286,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
     filename = "KNN_TestModel.joblib" 
     self.model = load(path+filename)
-    # ###
 
   def setDefaultParameters(self, parameterNode):
     """
@@ -328,7 +328,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     stopTime = time.time()
     logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
 
-  # I added this portion of the code
   def addObservers(self):
     if self.spectrumImageNode:
       print("Add observer to {0}".format(self.spectrumImageNode.GetName()))
