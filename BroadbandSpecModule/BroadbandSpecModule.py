@@ -92,12 +92,26 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
   # My functions
   def onClearControlPointsButtonClicked(self):
+    # if the world point list is not present, create it
     if slicer.mrmlScene.GetFirstNodeByName('pointList_World') == None:
       pointList_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
       pointList_World.SetName('pointList_World')
     pointList_World = slicer.mrmlScene.GetFirstNodeByName("pointList_World")
+
+    if slicer.mrmlScene.GetFirstNodeByName('pointList_EMT') == None:
+      pointList_EMT = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
+      pointList_EMT.SetName('pointList_EMT')
+    pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
+
     pointList_World.RemoveAllMarkups()
-   
+    pointList_EMT.RemoveAllMarkups()
+    # add a control point at [0,0,0]
+    pointList_World.AddControlPoint(np.array([0, 0, 0]))
+    pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
+    # set the name to origin
+    pointList_World.SetNthControlPointLabel(0, "origin_World")
+    pointList_EMT.SetNthControlPointLabel(0, "origin_EMT")
+
   def onAddControlPointButtonClicked(self):
     '''  
     # Get the required nodes
@@ -109,39 +123,47 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       pointList_World.SetName('pointList_World')
     pointList_World = slicer.mrmlScene.GetFirstNodeByName("pointList_World")
 
-    # This is creating a pseudo EMT transform 
-    if slicer.mrmlScene.GetFirstNodeByName('EMT2WorldTransform') == None:
-      EMT2WorldTransform = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
-      EMT2WorldTransform.SetName('EMT2WorldTransform')
-      # EMT2WorldTransform.SetAndObserveTransformNodeID(EMT2World.GetID())
-    EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("EMT2WorldTransform")
-    EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
-    def randomTranslation():
-      x = 5*np.random.uniform(-1,1)
-      return x
-    EMT2WorldMat.SetElement(0,3,20+randomTranslation())
-    EMT2WorldMat.SetElement(1,3,20+randomTranslation())
-    EMT2WorldMat.SetElement(2,3,20+randomTranslation())
-    # print(EMT2WorldMat)
+    if slicer.mrmlScene.GetFirstNodeByName('pointList_EMT') == None:
+      pointList_EMT = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
+      pointList_EMT.SetName('pointList_EMT')
+    pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
 
-    # pointList_World.RemoveAllMarkups()
-    # Remove the name of control points 
-    # rename control points
-    # pointList_World.SetNthFiducialLabel(0, 'point1')
-
-
-    print('Adding control point')
-    # Get the current position of the EMT origin. This is just the translational component of the transform
+    # # This is creating a pseudo EMT transform 
+    # if slicer.mrmlScene.GetFirstNodeByName('EMT2WorldTransform') == None:
+    #   EMT2WorldTransform = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
+    #   EMT2WorldTransform.SetName('EMT2WorldTransform')
+    #   # EMT2WorldTransform.SetAndObserveTransformNodeID(EMT2WorldTranform.GetID())
+    # EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("EMT2WorldTransform")
     # EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
-    tip_World = EMT2WorldMat.MultiplyPoint(np.array([0,0,0,1]))
-    tip_World = tip_World[:-1]
+    # EMT2WorldMat.SetElement(0,3,20 + 5*np.random.uniform(-1,1))
+    # EMT2WorldMat.SetElement(1,3,20 + 5*np.random.uniform(-1,1))
+    # EMT2WorldMat.SetElement(2,3,20 + 5*np.random.uniform(-1,1))
 
+    # EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("ReferenceToTracker")
+
+    # print('Adding control point')
+    # # Get the current position of the EMT origin. This is just the translational component of the transform
+    # EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
+    # tip_World = EMT2WorldMat.MultiplyPoint(np.array([0,0,0,1]))
+    pos = [0,0,0,0]
+    pointList_EMT.GetNthFiducialWorldCoordinates(0,pos)
+    tip_World = pos[:-1]
+    print("Tip world:",tip_World)
     # Create a Control Point at the position
     pointList_World.AddControlPoint(tip_World)
     # Get length of the point list and set the last element label to ''
     length = pointList_World.GetNumberOfMarkups()
     if length != 0:
-      pointList_World.SetNthFiducialLabel(length-1, '')
+      pointList_World.SetNthFiducialLabel(length-1, '')  
+
+    # print the postion of all control poitns in list
+    pos = np.array([0,0,0,1])
+    # print(pointList_World.GetNumberOfMarkups())
+    for i in range(pointList_World.GetNumberOfMarkups()):
+      pointList_World.GetNthFiducialWorldCoordinates(i, pos )
+      # print(pos) 
+
+    # clear slicer pythobn interactor text
 
     # I also want to set the colour according to the current classification
     
@@ -160,7 +182,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     #   pointList_World.SetControlPointLabel(index, name)
     
     pass
-  
+
 
   def setEnablePlotting(self, enable):
     if enable:
@@ -393,7 +415,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
   def startPlotting(self, spectrumImageNode, outputTableNode):
     # Change the layout to one that has a chart.
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
-    ln.SetViewArrangement(24)
+    ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalPlotView)
+    
     self.removeObservers()
     self.spectrumImageNode=spectrumImageNode
     self.outputTableNode=outputTableNode    

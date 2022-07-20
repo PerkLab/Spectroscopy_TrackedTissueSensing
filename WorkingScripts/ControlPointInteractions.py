@@ -25,14 +25,18 @@ pointList.SetNthControlPointPositionFromArray(0,np.array([0,0,0]))
 # Delete all the points in the pointList_World
 pointList.RemoveAllMarkups()
 
-
+pos = [0,0,0,0]
+pointList.getNthFiducialWorldCoordinates(0,pos)
+pos = pos[:-1]
+# Get length of point list
+pointList.GetNumberOfControlPoints()
 #
 # Transforms
 #
 
 
 # Move the point list to a new reference frame
-pointList.SetAndObserveTransformNodeID(transform_EMTtoScene.GetID())
+pointList.SetAndObserveTransformNodeID(EMT2WorldTransform.GetID())
 
 
 #
