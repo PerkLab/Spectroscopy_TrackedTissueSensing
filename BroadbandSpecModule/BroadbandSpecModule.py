@@ -83,34 +83,85 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
     # (in the selected parameter node).
     self.ui.connectButton.connect('clicked(bool)', self.onConnectButtonClicked)
-    #self.ui.spectrumImageSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-    #self.ui.outputTableSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
     self.ui.enablePlottingCheckBox.connect('stateChanged(int)', self.setEnablePlotting)
-    self.ui.addControlPoint.connect('clicked(bool)', self.onaddControlPointButtonClicked)
+    self.ui.addControlPoint.connect('clicked(bool)', self.onAddControlPointButtonClicked)
+    self.ui.clearControlPoints.connect('clicked(bool)', self.onClearControlPointsButtonClicked)
 
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
 
-  # My functions 
-  def onaddControlPointButtonClicked(self):
+  # My functions
+  def onClearControlPointsButtonClicked(self):
+    if slicer.mrmlScene.GetFirstNodeByName('pointList_World') == None:
+      pointList_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
+      pointList_World.SetName('pointList_World')
+    pointList_World = slicer.mrmlScene.GetFirstNodeByName("pointList_World")
+    pointList_World.RemoveAllMarkups()
+   
+  def onAddControlPointButtonClicked(self):
     '''  
     # Get the required nodes
     - EMT transform
     - pointList
     '''
-    EMT2World = slicer.util.getNode('pseudoEMT')
-    pointList_World = slicer.util.getNode('pointList_World')
+    if slicer.mrmlScene.GetFirstNodeByName('pointList_World') == None:
+      pointList_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
+      pointList_World.SetName('pointList_World')
+    pointList_World = slicer.mrmlScene.GetFirstNodeByName("pointList_World")
+
+    # This is creating a pseudo EMT transform 
+    if slicer.mrmlScene.GetFirstNodeByName('EMT2WorldTransform') == None:
+      EMT2WorldTransform = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
+      EMT2WorldTransform.SetName('EMT2WorldTransform')
+      # EMT2WorldTransform.SetAndObserveTransformNodeID(EMT2World.GetID())
+    EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("EMT2WorldTransform")
+    EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
+    def randomTranslation():
+      x = 5*np.random.uniform(-1,1)
+      return x
+    EMT2WorldMat.SetElement(0,3,20+randomTranslation())
+    EMT2WorldMat.SetElement(1,3,20+randomTranslation())
+    EMT2WorldMat.SetElement(2,3,20+randomTranslation())
+    # print(EMT2WorldMat)
+
+    # pointList_World.RemoveAllMarkups()
+    # Remove the name of control points 
+    # rename control points
+    # pointList_World.SetNthFiducialLabel(0, 'point1')
+
+
     print('Adding control point')
     # Get the current position of the EMT origin. This is just the translational component of the transform
-    EMT2WorldMat = EMT2World.GetMatrixTransformToParent()
+    # EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
     tip_World = EMT2WorldMat.MultiplyPoint(np.array([0,0,0,1]))
     tip_World = tip_World[:-1]
+
     # Create a Control Point at the position
     pointList_World.AddControlPoint(tip_World)
+    # Get length of the point list and set the last element label to ''
+    length = pointList_World.GetNumberOfMarkups()
+    if length != 0:
+      pointList_World.SetNthFiducialLabel(length-1, '')
+
     # I also want to set the colour according to the current classification
+    
+    # def classifySpectrum(spectrum):
+    #   # Get the current classification
+    #   classification = self.logic.classifySpectrum(spectrum)
+    #   # Get the colour for the classification
+    #   colour = self.logic.getColour(classification)
+    #   # Set the colour of the control point
+    #   pointList_World.SetControlPointColor(pointList_World.GetNumberOfControlPoints()-1, colour)
+
+    # def changeControlPointColour(pointList_World, index, colour):
+    #   pointList_World.SetControlPointColor(index, colour)
+
+    # def changeControlPointName(pointList_World, index, name):
+    #   pointList_World.SetControlPointLabel(index, name)
     
     pass
   
+
   def setEnablePlotting(self, enable):
     if enable:
       self.logic.startPlotting(self.ui.spectrumImageSelector.currentNode(), self.ui.outputTableSelector.currentNode())

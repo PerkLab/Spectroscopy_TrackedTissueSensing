@@ -4,9 +4,6 @@
 - Transform data to a different reference frame (Use Liv's code )
 - 
 '''
-
-
-
 #
 # Control Points
 #
@@ -25,11 +22,16 @@ pointList.GetDisplayNode().SetSelectedColor(0.3,0.6,0.1) # makes it green for he
 pointList.SetNthControlPointVisibility(0,True)
 #Change the position and orientation of a previously make control point
 pointList.SetNthControlPointPositionFromArray(0,np.array([0,0,0]))
+# Delete all the points in the pointList_World
+pointList.RemoveAllMarkups()
+
 
 #
 # Transforms
 #
 
+
+# Move the point list to a new reference frame
 pointList.SetAndObserveTransformNodeID(transform_EMTtoScene.GetID())
 
 
@@ -61,6 +63,7 @@ for i in range(probeTip.GetNumberOfMarkups()):
 
       return outputPoints
 
+# Other code for Control Points
 def initialize_points(self):
    slicer.modules.markups.logic().SetActiveListID(self.markup_node)
    self.markup_node.SetControlPointLabelFormat('P%d')
@@ -68,3 +71,10 @@ def initialize_points(self):
        self.markup_node.AddControlPoint([0, 0, 0])
    self.markup_node.UnsetAllControlPoints()
    self.markup_node.SetMaximumNumberOfControlPoints(self.N_POINT)
+
+def place_points(self):
+   slicer.modules.markups.logic().SetActiveListID(self.markup_node)
+   for i in range(1, self.N_POINT + 1):
+       self.markup_node.SetNthControlPointPositionFromArray(i, self.points[i - 1])
+       self.markup_node.SetNthControlPointLabel(i, str(i))
+       self.markup_node.SetNthControlPointVisibility(i, 1)
