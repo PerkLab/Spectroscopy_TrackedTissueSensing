@@ -99,26 +99,49 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
   def onOutputTableChanged(self, node):
     self.updateParameterNodeFromGUI()
 
-  def onClearControlPointsButtonClicked(self):
-    # if the world point list is not present, create it
-    if slicer.mrmlScene.GetFirstNodeByName('pointList_World') == None:
-      pointList_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
-      pointList_World.SetName('pointList_World')
-    pointList_World = slicer.mrmlScene.GetFirstNodeByName("pointList_World")
+  def setupLists(self):
+    '''
+    This function is used to create the point lists if they're not present.
+    '''
+    # Check for the Green List
+    if slicer.mrmlScene.GetFirstNodeByName('pointListGreen_World') == None:
+      pointListGreen_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
+      pointListGreen_World.SetName('pointListGreen_World')
+      pointListGreen_World.GetDisplayNode().SetSelectedColor(0,1,0) # Set colour to green
 
+    # Check for the Red List
+    if slicer.mrmlScene.GetFirstNodeByName('pointListRed_World') == None:
+      pointListRed_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
+      pointListRed_World.SetName('pointListRed_World')
+      pointListRed_World.GetDisplayNode().SetSelectedColor(1,0,0) # Set colour to red
+    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName('pointListRed_World')
+    # Get the size of a control point
+    # controlPointSize = pointListRed_World.GetMarkupsDisplayNode().GetGlyphScale()
+    # Set the size of the control point
+    # pointListRed_World.GetMarkupsDisplayNode().SetGlyphScale(2)
+    # Set an absolute size for the control point
+
+    # Check for the EMT list
     if slicer.mrmlScene.GetFirstNodeByName('pointList_EMT') == None:
       pointList_EMT = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
       pointList_EMT.SetName('pointList_EMT')
+      #add pointList_EMT to the EMT reference frame
     pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
+    # pointList_EMT.SetAndObserveTransformNodeID(slicer.mrmlScene.GetFirstNodeByName('ProbeTiptoProbe').GetID())
 
-    pointList_World.RemoveAllMarkups()
-    pointList_EMT.RemoveAllMarkups()
-    # add a control point at [0,0,0]
-    pointList_World.AddControlPoint(np.array([0, 0, 0]))
-    pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
-    # set the name to origin
-    pointList_World.SetNthControlPointLabel(0, "origin_World")
-    pointList_EMT.SetNthControlPointLabel(0, "origin_EMT")
+    # if pointList_EMT is empty, add a point at the origin
+    if pointList_EMT.GetNumberOfControlPoints() == 0:
+      pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
+      pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
+    pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
+
+  def onClearControlPointsButtonClicked(self):
+    # Check to see if the lists exist, and if not create them
+    self.setupLists()
+    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
+    pointListGreen_World.RemoveAllMarkups()
+    pointListRed_World.RemoveAllMarkups()
 
   def onAddControlPointButtonClicked(self):
     '''  
@@ -126,14 +149,11 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     - EMT transform
     - pointList
     '''
-    if slicer.mrmlScene.GetFirstNodeByName('pointList_World') == None:
-      pointList_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
-      pointList_World.SetName('pointList_World')
-    pointList_World = slicer.mrmlScene.GetFirstNodeByName("pointList_World")
-
-    if slicer.mrmlScene.GetFirstNodeByName('pointList_EMT') == None:
-      pointList_EMT = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
-      pointList_EMT.SetName('pointList_EMT')
+    # Check to see if the lists exist, and if not create them
+    self.setupLists()
+    # Get the required nodes
+    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
     pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
 
     # # This is creating a pseudo EMT transform 
@@ -146,59 +166,46 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     # EMT2WorldMat.SetElement(0,3,20 + 5*np.random.uniform(-1,1))
     # EMT2WorldMat.SetElement(1,3,20 + 5*np.random.uniform(-1,1))
     # EMT2WorldMat.SetElement(2,3,20 + 5*np.random.uniform(-1,1))
-
     # EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("ReferenceToTracker")
-
     # print('Adding control point')
     # # Get the current position of the EMT origin. This is just the translational component of the transform
     # EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
     # tip_World = EMT2WorldMat.MultiplyPoint(np.array([0,0,0,1]))
+
+    # The the tip of the probe in world coordinates
     pos = [0,0,0,0]
     pointList_EMT.GetNthFiducialWorldCoordinates(0,pos)
     tip_World = pos[:-1]
-    # print("Tip world:",tip_World)
-    # Create a Control Point at the position
-    pointList_World.AddControlPoint(tip_World)
-    # Get length of the point list and set the last element label to ''
-    length = pointList_World.GetNumberOfMarkups()
-    if length != 0:
-      pointList_World.SetNthFiducialLabel(length-1, '')  
 
-    # print the postion of all control poitns in list
-    pos = np.array([0,0,0,1])
-    # print(pointList_World.GetNumberOfMarkups())
-    for i in range(pointList_World.GetNumberOfMarkups()):
-      pointList_World.GetNthFiducialWorldCoordinates(i, pos )
-      # print(pos) 
+    # Create a Control Point at the position based on the classification
+    parameterNode = self.logic.getParameterNode()
+    spectrumLabel = parameterNode.GetParameter(self.logic.CLASSIFICATION)
+    if spectrumLabel == self.logic.CLASS_LABEL_0:
+      print('Placing Green Point')
+      pointListGreen_World.AddControlPoint(tip_World)
+      # set label of the control point to ''
+      pointListGreen_World.SetNthControlPointLabel(pointListGreen_World.GetNumberOfControlPoints()-1, '')
+    elif spectrumLabel == self.logic.CLASS_LABEL_1:
+      print('Placing Red Point')
+      pointListRed_World.AddControlPoint(tip_World)
+      pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
 
-    # clear slicer pythobn interactor text
-
-    # I also want to set the colour according to the current classification
-    
-    # def classifySpectrum(spectrum):
-    #   # Get the current classification
-    #   classification = self.logic.classifySpectrum(spectrum)
-    #   # Get the colour for the classification
-    #   colour = self.logic.getColour(classification)
-    #   # Set the colour of the control point
-    #   pointList_World.SetControlPointColor(pointList_World.GetNumberOfControlPoints()-1, colour)
-
-    # def changeControlPointColour(pointList_World, index, colour):
-    #   pointList_World.SetControlPointColor(index, colour)
-
-    # def changeControlPointName(pointList_World, index, name):
-    #   pointList_World.SetControlPointLabel(index, name)
-    
     pass
 
 
   def setEnablePlotting(self, enable):
+    # print('Enable Value:',enable)
     if enable:
+      # print('Enabling plotting')
       self.logic.startPlotting()
     else:
+      # print('Disabling plotting')
       self.logic.stopPlotting()
 
   def onConnectButtonClicked(self):
+    '''
+    This function creates the IGTL connection for the Spectrometer and the EMT 
+    '''
     nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
     if nodeList == []: # if there are no nodes, create one for each device
       connectorNode_Spec = slicer.vtkMRMLIGTLConnectorNode()
@@ -253,15 +260,16 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     The module GUI is updated to show the current state of the parameter node.
     """
 
-    if self._parameterNode is None or self._updatingGUIFromParameterNode:
+    # It doesn't update if the paramater node is empty or is already updating the GUI
+    if self._parameterNode is None or self._updatingGUIFromParameterNode: 
       return
 
     # Make sure GUI changes do not call updateParameterNodeFromGUI (it could cause infinite loop)
     self._updatingGUIFromParameterNode = True
 
     # Update node selectors
-    self.ui.spectrumImageSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
-    self.ui.outputTableSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputVolume"))
+    self.ui.spectrumImageSelector.setCurrentNode(self._parameterNode.GetNodeReference(self.logic.INPUT_VOLUME))
+    self.ui.outputTableSelector.setCurrentNode(self._parameterNode.GetNodeReference(self.logic.OUTPUT_TABLE))
 
     # Update buttons state
     nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
@@ -274,7 +282,8 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       else:
         self.ui.connectButton.text = 'Disconnect' 
     
-    # self.ui.enablePlottingCheckBox.connect('stateChanged(int)', self.setEnablePlotting)
+    # Update Checkbox state
+    # self.ui.enablePlottingCheckBox.setChecked(self._parameterNode.GetParameter('EnablePlotting'))
 
     # All the GUI updates are done
     self._updatingGUIFromParameterNode = False
@@ -340,10 +349,10 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.setParameterNode(self.logic.getParameterNode())
 
     # Select default input nodes if nothing is selected yet to save a few clicks for the user
-    if not self._parameterNode.GetNodeReference("InputVolume"):
+    if not self._parameterNode.GetNodeReference(self.logic.INPUT_VOLUME):
       firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
       if firstVolumeNode:
-        self._parameterNode.SetNodeReferenceID("InputVolume", firstVolumeNode.GetID())
+        self._parameterNode.SetNodeReferenceID(self.logic.INPUT_VOLUME, firstVolumeNode.GetID())
 
 
 #
@@ -361,19 +370,16 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
   """
   INPUT_VOLUME = "InputVolume"
   OUTPUT_TABLE = "OutputTable"
+  CLASSIFICATION = "Classification"
+  CLASS_LABEL_0 = "Desk"
+  CLASS_LABEL_1 = "Cork"
 
   def __init__(self):
     """
     Called when the logic class is instantiated. Can be used for initializing member variables.
     """
     ScriptedLoadableModuleLogic.__init__(self)
-    # I should be able to remove these definitions and just use the parameter node
-    # self.chartNodeID = None
-    # self.spectrumImageNode = None
-    # self.outputTableNode = None
     self.observerTags = []
-    # self.resolution = 100
-    # self.plotChartNode = None 
     # ###
     slicer.mymodLog = self
     path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
@@ -389,18 +395,18 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     if not parameterNode.GetParameter("Invert"):
       parameterNode.SetParameter("Invert", "false")
 
-  def process(self, inputVolume, outputVolume, imageThreshold, invert=False, showResult=True):
+  def process(self, inputVolume, outputTable, imageThreshold, invert=False, showResult=True):
     """
     Run the processing algorithm.
     Can be used without GUI widget.
     :param inputVolume: volume to be thresholded
-    :param outputVolume: thresholding result
+    :param outputTable: thresholding result
     :param imageThreshold: values above/below this threshold will be set to 0
     :param invert: if True then values above the threshold will be set to 0, otherwise values below are set to 0
     :param showResult: show output volume in slice viewers
     """
 
-    if not inputVolume or not outputVolume:
+    if not inputVolume or not outputTable:
       raise ValueError("Input or output volume is invalid")
 
     import time
@@ -409,8 +415,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
 
     # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
     cliParams = {
-      'InputVolume': inputVolume.GetID(),
-      'OutputVolume': outputVolume.GetID(),
+      self.INPUT_VOLUME: inputVolume.GetID(),
+      self.OUTPUT_TABLE: outputTable.GetID(),
       'ThresholdValue' : imageThreshold,
       'ThresholdType' : 'Above' if invert else 'Below'
       }
@@ -424,7 +430,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
   def addObservers(self):
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
-    outputTableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
     if spectrumImageNode:
       print("Add observer to {0}".format(spectrumImageNode.GetName()))
       self.observerTags.append([spectrumImageNode, spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified)])
@@ -437,14 +442,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
 
   def startPlotting(self):
     # Change the layout to one that has a chart.
-    print('hello')
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
     ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalPlotView)
-    parameterNode = self.getParameterNode()
-    spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
-    outputTableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
     self.removeObservers()  
-
     # Start the updates
     self.addObservers()
     self.onSpectrumImageNodeModified(0,0)
@@ -462,6 +462,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
   
     self.updateOutputTable()
     self.updateChart()
+    # print(parameterNode.GetParameter(self.CLASSIFICATION))
+
   
   def updateOutputTable(self):
     pass
@@ -486,9 +488,13 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     X_test = X_test[:,1].reshape(1,-1)
     predicted = self.model.predict(X_test)
     if predicted[0] == 0:
-      label = 'Desk'
+      label = self.CLASS_LABEL_0
     elif predicted[0] == 1:
-      label = 'Cork'
+      label = self.CLASS_LABEL_1
+    # Save the prediction to the parameter node
+    parameterNode = self.getParameterNode()
+    parameterNode.SetParameter(self.CLASSIFICATION, label)
+
     return predicted, label
 
   def updateChart(self):
