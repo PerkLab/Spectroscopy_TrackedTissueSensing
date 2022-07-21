@@ -86,11 +86,19 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.ui.enablePlottingCheckBox.connect('stateChanged(int)', self.setEnablePlotting)
     self.ui.addControlPoint.connect('clicked(bool)', self.onAddControlPointButtonClicked)
     self.ui.clearControlPoints.connect('clicked(bool)', self.onClearControlPointsButtonClicked)
+    self.ui.spectrumImageSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onSpectrumImageChanged)
+    self.ui.outputTableSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onOutputTableChanged)
 
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
 
   # My functions
+  def onSpectrumImageChanged(self, node):
+    self.updateParameterNodeFromGUI()
+
+  def onOutputTableChanged(self, node):
+    self.updateParameterNodeFromGUI()
+
   def onClearControlPointsButtonClicked(self):
     # if the world point list is not present, create it
     if slicer.mrmlScene.GetFirstNodeByName('pointList_World') == None:
@@ -148,7 +156,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     pos = [0,0,0,0]
     pointList_EMT.GetNthFiducialWorldCoordinates(0,pos)
     tip_World = pos[:-1]
-    print("Tip world:",tip_World)
+    # print("Tip world:",tip_World)
     # Create a Control Point at the position
     pointList_World.AddControlPoint(tip_World)
     # Get length of the point list and set the last element label to ''
@@ -186,25 +194,34 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
   def setEnablePlotting(self, enable):
     if enable:
-      self.logic.startPlotting(self.ui.spectrumImageSelector.currentNode(), self.ui.outputTableSelector.currentNode())
+      self.logic.startPlotting()
     else:
       self.logic.stopPlotting()
 
   def onConnectButtonClicked(self):
     nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
-    if nodeList == []:
-      connectorNode = slicer.vtkMRMLIGTLConnectorNode()
-      slicer.mrmlScene.AddNode(connectorNode)
-      connectorNode.SetTypeClient('localhost', 18944)
-      connectorNode.Start()
+    if nodeList == []: # if there are no nodes, create one for each device
+      connectorNode_Spec = slicer.vtkMRMLIGTLConnectorNode()
+      connectorNode_Spec.SetName('IGTLConnector_Spec')
+      connectorNode_EMT = slicer.vtkMRMLIGTLConnectorNode()
+      connectorNode_EMT.SetName('IGTLConnector_EMT')
+      slicer.mrmlScene.AddNode(connectorNode_Spec)
+      slicer.mrmlScene.AddNode(connectorNode_EMT)
+      connectorNode_Spec.SetTypeClient('localhost', 18944)
+      connectorNode_EMT.SetTypeClient('localhost', 18945)
+      connectorNode_Spec.Start()
+      connectorNode_EMT.Start()
       self.ui.connectButton.text = 'Disconnect'
     else:
-      connectorNode = nodeList[0]
-      if connectorNode.GetState() == 0:
-        connectorNode.Start()
+      connectorNode_Spec = nodeList[0]
+      connectorNode_EMT = nodeList[1]
+      if connectorNode_Spec.GetState() == 0:
+        connectorNode_Spec.Start()
+        connectorNode_EMT.Start()
         self.ui.connectButton.text = 'Disconnect'
       else:
-        connectorNode.Stop()
+        connectorNode_Spec.Stop()
+        connectorNode_EMT.Stop()
         self.ui.connectButton.text = 'Connect' 
 
   # Predefined functions
@@ -273,8 +290,8 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     wasModified = self._parameterNode.StartModify()  # Modify all properties in a single batch
 
-    self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.spectrumImageSelector.currentNodeID)
-    self._parameterNode.SetNodeReferenceID("OutputVolume", self.ui.outputTableSelector.currentNodeID)
+    self._parameterNode.SetNodeReferenceID(self.logic.INPUT_VOLUME, self.ui.spectrumImageSelector.currentNodeID)
+    self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, self.ui.outputTableSelector.currentNodeID)
     
     self._parameterNode.EndModify(wasModified)
  
@@ -342,18 +359,21 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
   Uses ScriptedLoadableModuleLogic base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
+  INPUT_VOLUME = "InputVolume"
+  OUTPUT_TABLE = "OutputTable"
 
   def __init__(self):
     """
     Called when the logic class is instantiated. Can be used for initializing member variables.
     """
     ScriptedLoadableModuleLogic.__init__(self)
-    self.chartNodeID = None
-    self.spectrumImageNode = None
+    # I should be able to remove these definitions and just use the parameter node
+    # self.chartNodeID = None
+    # self.spectrumImageNode = None
+    # self.outputTableNode = None
     self.observerTags = []
-    self.outputTableNode = None
-    self.resolution = 100
-    self.plotChartNode = None 
+    # self.resolution = 100
+    # self.plotChartNode = None 
     # ###
     slicer.mymodLog = self
     path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
@@ -402,9 +422,12 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
 
   def addObservers(self):
-    if self.spectrumImageNode:
-      print("Add observer to {0}".format(self.spectrumImageNode.GetName()))
-      self.observerTags.append([self.spectrumImageNode, self.spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified)])
+    parameterNode = self.getParameterNode()
+    spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    outputTableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
+    if spectrumImageNode:
+      print("Add observer to {0}".format(spectrumImageNode.GetName()))
+      self.observerTags.append([spectrumImageNode, spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified)])
 
   # This function does not work correctly as the plot continues to plot. ***
   def removeObservers(self):
@@ -412,14 +435,15 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     for nodeTagPair in self.observerTags:
       nodeTagPair[0].RemoveObserver(nodeTagPair[1])
 
-  def startPlotting(self, spectrumImageNode, outputTableNode):
+  def startPlotting(self):
     # Change the layout to one that has a chart.
+    print('hello')
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
     ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalPlotView)
-    
-    self.removeObservers()
-    self.spectrumImageNode=spectrumImageNode
-    self.outputTableNode=outputTableNode    
+    parameterNode = self.getParameterNode()
+    spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    outputTableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
+    self.removeObservers()  
 
     # Start the updates
     self.addObservers()
@@ -429,8 +453,11 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     self.removeObservers()  
 
   def onSpectrumImageNodeModified(self, observer, eventid):
-  
-    if not self.spectrumImageNode or not self.outputTableNode:
+    parameterNode = self.getParameterNode()
+    spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    outputTableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
+    
+    if not spectrumImageNode or not outputTableNode:
       return
   
     self.updateOutputTable()
@@ -466,17 +493,19 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
 
   def updateChart(self):
     # Get the table created by the selector
-    tableNode = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLTableNode')
+    parameterNode = self.getParameterNode()
+    spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    tableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
 
     # Throw an error if the image has improper dimensions
-    numberOfPoints = self.spectrumImageNode.GetImageData().GetDimensions()[0]
-    numberOfRows = self.spectrumImageNode.GetImageData().GetDimensions()[1]
+    numberOfPoints = spectrumImageNode.GetImageData().GetDimensions()[0]
+    numberOfRows = spectrumImageNode.GetImageData().GetDimensions()[1]
     if numberOfRows!=2:
       logging.error("Spectrum image is expected to have exactly 2 rows, got {0}".format(numberOfRows))
       return
 
     # Get the image from the volume selector
-    specIm = self.spectrumImageNode
+    specIm = spectrumImageNode
     # Convert it to a displayable format
     specArray = slicer.util.arrayFromVolume(specIm)
     specArray = np.squeeze(specArray)
@@ -513,7 +542,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     plotChartNode.SetTitle(str(specLabel))
     plotChartNode.SetXAxisTitle('Wavelength [nm]')
     plotChartNode.SetYAxisTitle('Intensity')
-    self.plotChartNode = plotChartNode 
+    # self.plotChartNode = plotChartNode 
 
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
