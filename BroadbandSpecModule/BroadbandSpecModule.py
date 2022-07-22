@@ -84,8 +84,9 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     # (in the selected parameter node).
     self.ui.connectButton.connect('clicked(bool)', self.onConnectButtonClicked)
     self.ui.enablePlottingCheckBox.connect('stateChanged(int)', self.setEnablePlotting)
-    self.ui.addControlPoint.connect('clicked(bool)', self.onAddControlPointButtonClicked)
-    self.ui.clearControlPoints.connect('clicked(bool)', self.onClearControlPointsButtonClicked)
+    self.ui.addControlPointButton.connect('clicked(bool)', self.onAddControlPointButtonClicked)
+    self.ui.modelFileSelector.connect('currentPathChanged(QString)', self.onModelFileSelectorChanged)
+    self.ui.clearControlPointsButton.connect('clicked(bool)', self.onClearControlPointsButtonClicked)
     self.ui.spectrumImageSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onSpectrumImageChanged)
     self.ui.outputTableSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onOutputTableChanged)
 
@@ -93,10 +94,23 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.initializeParameterNode()
 
   # My functions
-  def onSpectrumImageChanged(self, node):
+  def onModelFileSelectorChanged(self):
+    self.updateParameterNodeFromGUI()
+    # get the file from the modelFileSelector
+    modelPath = self.ui.modelFileSelector.currentPath
+    # update the parameter node with the new model path
+    parameterNode = self.logic.getParameterNode()
+    parameterNode.SetParameter('modelPath', modelPath)
+    print('Loading in:', modelPath)
+    if not (modelPath == ''): 
+      self.logic.model = load(modelPath)
+    # set the default currentPath to the modelFileSelector
+    
+
+  def onSpectrumImageChanged(self):
     self.updateParameterNodeFromGUI()
 
-  def onOutputTableChanged(self, node):
+  def onOutputTableChanged(self):
     self.updateParameterNodeFromGUI()
 
   def setupLists(self):
@@ -290,7 +304,6 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     # All the GUI updates are done
     self._updatingGUIFromParameterNode = False
 
-  # 
   def updateParameterNodeFromGUI(self, caller=None, event=None):
     """
     This method is called when the user makes any change in the GUI.
@@ -386,8 +399,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   INPUT_VOLUME = "InputVolume"
   OUTPUT_TABLE = "OutputTable"
   CLASSIFICATION = "Classification"
-  CLASS_LABEL_0 = "Desk"
-  CLASS_LABEL_1 = "Cork"
+  CLASS_LABEL_0 = "White"
+  CLASS_LABEL_1 = "Blue"
+  CLASS_LABEL_NONE = "WeakSignal"
 
   def __init__(self):
     """
@@ -398,8 +412,10 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # ###
     slicer.mymodLog = self
     path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
-    filename = "KNN_TestModel.joblib" 
-    self.model = load(path+filename)
+    # filename = "KNN_TestModel.joblib" 
+    filename = "KNN_BlueVsWhite.joblib" 
+    self.model = load(path + filename)
+
 
   def setDefaultParameters(self, parameterNode):
     """
@@ -553,10 +569,19 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
 
   def classifySpectra(self,X_test):
-    #X_test = self.normalize(X_test)
+    # Get the max value in X_test
+    max_value = np.amax(X_test[:,1])
+    # Shape of X_test
+    # shape = X_test.shape
+    # print("Max value: {0}".format(max_value))
+    # print("Shape: {0}".format(shape))
+    
+    X_test = self.normalize(X_test)
     X_test = X_test[:,1].reshape(1,-1)
     predicted = self.model.predict(X_test)
-    if predicted[0] == 0:
+    if max_value < 0.1:
+      label = self.CLASS_LABEL_NONE
+    elif predicted[0] == 0:
       label = self.CLASS_LABEL_0
     elif predicted[0] == 1:
       label = self.CLASS_LABEL_1

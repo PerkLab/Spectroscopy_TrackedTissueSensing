@@ -4,15 +4,15 @@ import numpy as np
 import pandas as pd
 
 # Select the label and append it to the end of the 
-label = 0
+label = 1
 
 # This code is used to access a sequence from slicer and convert it to a numpy array to later export
-seqNode  = slicer.mrmlScene.GetFirstNodeByName('Sequence')
+seqNode  = slicer.mrmlScene.GetFirstNodeByName('Sequence_3')
 # The sequence contains n data nodes
-name = 'cork'
-folder = 'C:/OpticalSpectroscopy_TissueClassification/broadbandTestData/cork/'
+name = 'white'
+folder = 'C:/OpticalSpectroscopy_TissueClassification/broadbandTestData/white/'
 
-for idx in range(seqNode.GetNumberOfDataNodes()):
+for idx in range(149):#seqNode.GetNumberOfDataNodes()):
     volumeNode = seqNode.GetNthDataNode(idx)
     specArray = slicer.util.arrayFromVolume(volumeNode)
     specArray = np.squeeze(specArray)

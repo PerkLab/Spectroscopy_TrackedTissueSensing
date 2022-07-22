@@ -114,17 +114,24 @@
     </widget>
    </item>
    <item>
-    <widget class="ctkPathLineEdit" name="PathLineEdit"/>
+    <widget class="ctkPathLineEdit" name="modelFileSelector">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="acceptDrops">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="addControlPoint">
+    <widget class="QPushButton" name="addControlPointButton">
      <property name="text">
       <string>Add Control Point at Tool Tip</string>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="clearControlPoints">
+    <widget class="QPushButton" name="clearControlPointsButton">
      <property name="text">
       <string>Clear Points</string>
      </property>
