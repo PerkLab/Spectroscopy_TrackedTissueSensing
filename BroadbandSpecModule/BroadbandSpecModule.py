@@ -335,7 +335,8 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     """
     Called when the application closes and the module widget is destroyed.
     """
-    self.removeObservers()
+    # print the observer list
+    self.logic.removeObservers()
   
   def enter(self):
     """
@@ -367,8 +368,6 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       self.initializeParameterNode()
 
 
-
-
 #
 # BroadbandSpecModuleLogic
 #
@@ -387,7 +386,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   CLASSIFICATION = "Classification"
   CLASS_LABEL_0 = "Desk"
   CLASS_LABEL_1 = "Cork"
-
 
   def __init__(self):
     """
@@ -455,22 +453,13 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
 
   # This function does not work correctly as the plot continues to plot. ***
   def removeObservers(self):
-    print("Remove observers")
-    # parameterNode = self.getParameterNode()
-    # spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
-    # spectrumImageNode.RemoveObserver(vtk.vtkCommand.ModifiedEvent)
-    # spectrumImageNode.RemoveAllObservers()
-    # print('here')
-    # plotSeriesNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotSeriesNode") 
-    # plotSeriesNode.RemoveAllObservers()
-    #print the length of the observerTags
-    # print('The length of the observerTags: ',len(self.observerTags))
+    # print("Remove observers")
     for nodeTagPair in self.observerTags:
-      # print('index being removed',nodeTagPair[1])
       nodeTagPair[0].RemoveObserver(nodeTagPair[1])
 
   def startPlotting(self):
     # Change the layout to one that has a chart.
+    print("Start plotting")
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
     ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalPlotView)
     self.removeObservers()  
@@ -479,12 +468,11 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     self.onSpectrumImageNodeModified(0,0)
 
   def stopPlotting(self):
-    # print('Removing observers')
+    print("Stop plotting")
     # Set layout to conventional widescreen
-    # ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
+    ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
     # ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUp3DView)
-    #ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalWidescreenView)
-    # self.removeObserver()
+    ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalWidescreenView)
     self.removeObservers()  
 
   def onSpectrumImageNodeModified(self, observer, eventid):
