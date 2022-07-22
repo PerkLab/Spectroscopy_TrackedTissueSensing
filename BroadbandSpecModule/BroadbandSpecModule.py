@@ -156,42 +156,44 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
     pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
 
-    # # This is creating a pseudo EMT transform 
-    # if slicer.mrmlScene.GetFirstNodeByName('EMT2WorldTransform') == None:
-    #   EMT2WorldTransform = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
-    #   EMT2WorldTransform.SetName('EMT2WorldTransform')
-    #   # EMT2WorldTransform.SetAndObserveTransformNodeID(EMT2WorldTranform.GetID())
-    # EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("EMT2WorldTransform")
-    # EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
-    # EMT2WorldMat.SetElement(0,3,20 + 5*np.random.uniform(-1,1))
-    # EMT2WorldMat.SetElement(1,3,20 + 5*np.random.uniform(-1,1))
-    # EMT2WorldMat.SetElement(2,3,20 + 5*np.random.uniform(-1,1))
-    # EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("ReferenceToTracker")
-    # print('Adding control point')
-    # # Get the current position of the EMT origin. This is just the translational component of the transform
-    # EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
-    # tip_World = EMT2WorldMat.MultiplyPoint(np.array([0,0,0,1]))
+    '''
+    # This is creating a pseudo EMT transform 
+    if slicer.mrmlScene.GetFirstNodeByName('EMT2WorldTransform') == None:
+      EMT2WorldTransform = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
+      EMT2WorldTransform.SetName('EMT2WorldTransform')
+      # EMT2WorldTransform.SetAndObserveTransformNodeID(EMT2WorldTranform.GetID())
+    EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("EMT2WorldTransform")
+    EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
+    EMT2WorldMat.SetElement(0,3,20 + 5*np.random.uniform(-1,1))
+    EMT2WorldMat.SetElement(1,3,20 + 5*np.random.uniform(-1,1))
+    EMT2WorldMat.SetElement(2,3,20 + 5*np.random.uniform(-1,1))
+    EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("ReferenceToTracker")
+    print('Adding control point')
+    # Get the current position of the EMT origin. This is just the translational component of the transform
+    EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
+    tip_World = EMT2WorldMat.MultiplyPoint(np.array([0,0,0,1]))
+     '''
 
     # The the tip of the probe in world coordinates
     pos = [0,0,0,0]
     pointList_EMT.GetNthFiducialWorldCoordinates(0,pos)
     tip_World = pos[:-1]
 
-    # Create a Control Point at the position based on the classification
+    # Add control point at tip of probe based on classification
+    spectrumArray = self.logic.updateOutputTable()
+    self.logic.classifySpectra(spectrumArray[743:-1,:]) # Magic Number **
     parameterNode = self.logic.getParameterNode()
     spectrumLabel = parameterNode.GetParameter(self.logic.CLASSIFICATION)
+
     if spectrumLabel == self.logic.CLASS_LABEL_0:
-      print('Placing Green Point')
+      # print('Placing Green Point')
       pointListGreen_World.AddControlPoint(tip_World)
       # set label of the control point to ''
       pointListGreen_World.SetNthControlPointLabel(pointListGreen_World.GetNumberOfControlPoints()-1, '')
     elif spectrumLabel == self.logic.CLASS_LABEL_1:
-      print('Placing Red Point')
+      # print('Placing Red Point')
       pointListRed_World.AddControlPoint(tip_World)
       pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
-
-    pass
-
 
   def setEnablePlotting(self, enable):
     # print('Enable Value:',enable)
