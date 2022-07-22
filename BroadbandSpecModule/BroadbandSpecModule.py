@@ -288,6 +288,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     # All the GUI updates are done
     self._updatingGUIFromParameterNode = False
 
+  # 
   def updateParameterNodeFromGUI(self, caller=None, event=None):
     """
     This method is called when the user makes any change in the GUI.
@@ -303,6 +304,32 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, self.ui.outputTableSelector.currentNodeID)
     
     self._parameterNode.EndModify(wasModified)
+
+  def initializeParameterNode(self):
+    """
+    Ensure parameter node exists and observed.
+    """
+    # Parameter node stores all user choices in parameter values, node selections, etc.
+    # so that when the scene is saved and reloaded, these settings are restored.
+    # print('Initializing parameter node...')
+    self.setParameterNode(self.logic.getParameterNode())
+
+    # Select default input nodes if nothing is selected yet to save a few clicks for the user
+    if not self._parameterNode.GetNodeReference(self.logic.INPUT_VOLUME):
+      firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
+      if firstVolumeNode:
+        self._parameterNode.SetNodeReferenceID(self.logic.INPUT_VOLUME, firstVolumeNode.GetID())
+
+    # If no table selection exists, create one and select it
+    if not self._parameterNode.GetNodeReference(self.logic.OUTPUT_TABLE):
+      # if a table node is not selected, create a new one
+      firstTableNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLTableNode")
+      # if not firstTableNode:
+      #   firstTableNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLTableNode")
+      #   firstTableNode.SetName('Table')
+      #   slicer.mrmlScene.AddNode(firstTableNode)
+      if firstTableNode:
+        self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, firstTableNode.GetID())
  
   def cleanup(self):
     """
@@ -339,27 +366,14 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     if self.parent.isEntered:
       self.initializeParameterNode()
 
-  def initializeParameterNode(self):
-    """
-    Ensure parameter node exists and observed.
-    """
-    # Parameter node stores all user choices in parameter values, node selections, etc.
-    # so that when the scene is saved and reloaded, these settings are restored.
 
-    self.setParameterNode(self.logic.getParameterNode())
-
-    # Select default input nodes if nothing is selected yet to save a few clicks for the user
-    if not self._parameterNode.GetNodeReference(self.logic.INPUT_VOLUME):
-      firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
-      if firstVolumeNode:
-        self._parameterNode.SetNodeReferenceID(self.logic.INPUT_VOLUME, firstVolumeNode.GetID())
 
 
 #
 # BroadbandSpecModuleLogic
 #
 
-class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
+class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin): # added the mixin class
   """This class should implement all the actual
   computation done by your module.  The interface
   should be such that other python code can import
@@ -374,12 +388,13 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
   CLASS_LABEL_0 = "Desk"
   CLASS_LABEL_1 = "Cork"
 
+
   def __init__(self):
     """
     Called when the logic class is instantiated. Can be used for initializing member variables.
     """
     ScriptedLoadableModuleLogic.__init__(self)
-    self.observerTags = []
+    self.observerTags = [] # This is reset when the module is reloaded. But not all observers are removed.
     # ###
     slicer.mymodLog = self
     path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
@@ -390,10 +405,13 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     """
     Initialize parameter node with default settings.
     """
+    if not parameterNode.GetParameter(self.CLASSIFICATION):
+      parameterNode.SetParameter(self.CLASSIFICATION, '')
     if not parameterNode.GetParameter("Threshold"):
       parameterNode.SetParameter("Threshold", "100.0")
     if not parameterNode.GetParameter("Invert"):
       parameterNode.SetParameter("Invert", "false")
+
 
   def process(self, inputVolume, outputTable, imageThreshold, invert=False, showResult=True):
     """
@@ -433,11 +451,22 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     if spectrumImageNode:
       print("Add observer to {0}".format(spectrumImageNode.GetName()))
       self.observerTags.append([spectrumImageNode, spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified)])
+      # print('The observer index: ',spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified))
 
   # This function does not work correctly as the plot continues to plot. ***
   def removeObservers(self):
     print("Remove observers")
+    # parameterNode = self.getParameterNode()
+    # spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    # spectrumImageNode.RemoveObserver(vtk.vtkCommand.ModifiedEvent)
+    # spectrumImageNode.RemoveAllObservers()
+    # print('here')
+    # plotSeriesNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotSeriesNode") 
+    # plotSeriesNode.RemoveAllObservers()
+    #print the length of the observerTags
+    # print('The length of the observerTags: ',len(self.observerTags))
     for nodeTagPair in self.observerTags:
+      # print('index being removed',nodeTagPair[1])
       nodeTagPair[0].RemoveObserver(nodeTagPair[1])
 
   def startPlotting(self):
@@ -450,6 +479,12 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     self.onSpectrumImageNodeModified(0,0)
 
   def stopPlotting(self):
+    # print('Removing observers')
+    # Set layout to conventional widescreen
+    # ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
+    # ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUp3DView)
+    #ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalWidescreenView)
+    # self.removeObserver()
     self.removeObservers()  
 
   def onSpectrumImageNodeModified(self, observer, eventid):
@@ -460,45 +495,12 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     if not spectrumImageNode or not outputTableNode:
       return
   
-    self.updateOutputTable()
+    spectrumArray = self.updateOutputTable()
+    self.classifySpectra(spectrumArray[743:-1,:]) # Magic Number **
     self.updateChart()
-    # print(parameterNode.GetParameter(self.CLASSIFICATION))
 
-  
   def updateOutputTable(self):
-    pass
-  
-  # Normalize peak instensity to 1.0
-  def normalize(self,data):
-    temp = data.copy()
-    if len(temp.shape) == 2:
-        temp[:,1] = (temp[:,1] - min(temp[:,1]))
-        temp[:,1] = temp[:,1]/max(temp[:,1])
-    elif len(temp.shape) == 3:
-        for i in range(len(temp)):
-            temp[i,:,1] = (temp[i,:,1] - min(temp[i,:,1]))
-            temp[i,:,1] = temp[i,:,1]/max(temp[i,:,1])
-    else:
-        print('Error, array dimension is not 2 or 3')     
-    return temp
-
-  def classifySpectra(self,X_test):
-    # Load in the model (This will get loaded in every iteration which is not good)
-    #X_test = self.normalize(X_test)
-    X_test = X_test[:,1].reshape(1,-1)
-    predicted = self.model.predict(X_test)
-    if predicted[0] == 0:
-      label = self.CLASS_LABEL_0
-    elif predicted[0] == 1:
-      label = self.CLASS_LABEL_1
-    # Save the prediction to the parameter node
-    parameterNode = self.getParameterNode()
-    parameterNode.SetParameter(self.CLASSIFICATION, label)
-
-    return predicted, label
-
-  def updateChart(self):
-    # Get the table created by the selector
+        # Get the table created by the selector
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     tableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
@@ -516,20 +518,28 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     specArray = slicer.util.arrayFromVolume(specIm)
     specArray = np.squeeze(specArray)
     specArray = np.transpose(specArray)
- 
-    #
-    # Load in and classify the spectra using the model. This should be passed in as a parameter
-    #
-    specPred, specLabel = self.classifySpectra(specArray[743:-1,:]) # Magic Number **
 
     # Save results to a new table node
     if slicer.util.getNodesByClass('vtkMRMLTableNode') == []:
       tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
     slicer.util.updateTableFromArray(tableNode,specArray,["Wavelength","Intensity"])
 
+    return specArray
+    
+  
+  def updateChart(self):
+    #
+    # Load in and classify the spectra using the model. This should be passed in as a parameter
+    #
+    # specPred, specLabel = self.classifySpectra(specArray[743:-1,:]) 
+    parameterNode = self.getParameterNode()
+    spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    tableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
+    spectrumLabel = parameterNode.GetParameter(self.CLASSIFICATION)
+
     # Create plot
     if slicer.util.getNodesByClass('vtkMRMLPlotSeriesNode') == []:
-      plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", specIm.GetName() + " plot")
+      plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", spectrumImageNode.GetName() + " plot")
     plotSeriesNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotSeriesNode") 
     plotSeriesNode.SetAndObserveTableNodeID(tableNode.GetID())
     plotSeriesNode.SetXColumnName("Wavelength")
@@ -545,16 +555,40 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic):
     plotChartNode.YAxisRangeAutoOn() # The axes can be set or automatic by toggling between on and off
     # plotChartNode.SetYAxisRange(0, 2)
     # plotChartNode.SetTitle('Spectrum')
-    plotChartNode.SetTitle(str(specLabel))
+    plotChartNode.SetTitle(str(spectrumLabel))
     plotChartNode.SetXAxisTitle('Wavelength [nm]')
     plotChartNode.SetYAxisTitle('Intensity')
-    # self.plotChartNode = plotChartNode 
 
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
 
-  def addControlPointToTip(self):
-    pass
+  def classifySpectra(self,X_test):
+    #X_test = self.normalize(X_test)
+    X_test = X_test[:,1].reshape(1,-1)
+    predicted = self.model.predict(X_test)
+    if predicted[0] == 0:
+      label = self.CLASS_LABEL_0
+    elif predicted[0] == 1:
+      label = self.CLASS_LABEL_1
+    # Save the prediction to the parameter node
+    parameterNode = self.getParameterNode()
+    parameterNode.SetParameter(self.CLASSIFICATION, label)
+    return predicted, label
+
+  # Normalize peak instensity to 1.0
+  def normalize(self,data):
+    temp = data.copy()
+    if len(temp.shape) == 2:
+        temp[:,1] = (temp[:,1] - min(temp[:,1]))
+        temp[:,1] = temp[:,1]/max(temp[:,1])
+    elif len(temp.shape) == 3:
+        for i in range(len(temp)):
+            temp[i,:,1] = (temp[i,:,1] - min(temp[i,:,1]))
+            temp[i,:,1] = temp[i,:,1]/max(temp[i,:,1])
+    else:
+        print('Error, array dimension is not 2 or 3')     
+    return temp
+
 
 #
 # BroadbandSpecModuleTest
