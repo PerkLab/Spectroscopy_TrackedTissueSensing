@@ -7,12 +7,12 @@ import pandas as pd
 label = 1
 
 # This code is used to access a sequence from slicer and convert it to a numpy array to later export
-seqNode  = slicer.mrmlScene.GetFirstNodeByName('Sequence_3')
+seqNode  = slicer.mrmlScene.GetFirstNodeByName('Sequence')
 # The sequence contains n data nodes
-name = 'white'
-folder = 'C:/OpticalSpectroscopy_TissueClassification/broadbandTestData/white/'
+name = 'teaBox'
+folder = 'C:/OpticalSpectroscopy_TissueClassification/broadbandTestData/' + name + '/'
 
-for idx in range(149):#seqNode.GetNumberOfDataNodes()):
+for idx in range(seqNode.GetNumberOfDataNodes()):
     volumeNode = seqNode.GetNthDataNode(idx)
     specArray = slicer.util.arrayFromVolume(volumeNode)
     specArray = np.squeeze(specArray)
@@ -22,3 +22,6 @@ for idx in range(149):#seqNode.GetNumberOfDataNodes()):
     else:
         num = str(idx)
     np.savetxt(folder + name + num + '.csv', specArray, delimiter=',')
+
+# Clear the sequence node
+# seqNode.RemoveAllDataNodes()

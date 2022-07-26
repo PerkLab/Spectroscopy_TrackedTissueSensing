@@ -10,6 +10,8 @@ from slicer.util import VTKObservationMixin
 import numpy as np
 from joblib import dump, load
 import sklearn
+import Processfunctions as process
+import IOfunctions as IO
 
 #
 # BroadbandSpecModule
@@ -53,7 +55,6 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.logic = None
     self._parameterNode = None
     self._updatingGUIFromParameterNode = False
-
     slicer.mymod = self # Used to access nodes in the python interactor
 
   def setup(self):
@@ -339,10 +340,10 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     if not self._parameterNode.GetNodeReference(self.logic.OUTPUT_TABLE):
       # if a table node is not selected, create a new one
       firstTableNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLTableNode")
-      # if not firstTableNode:
-      #   firstTableNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLTableNode")
-      #   firstTableNode.SetName('Table')
-      #   slicer.mrmlScene.AddNode(firstTableNode)
+      if not firstTableNode:
+        firstTableNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLTableNode")
+        firstTableNode.SetName('Table')
+        slicer.mrmlScene.AddNode(firstTableNode)
       if firstTableNode:
         self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, firstTableNode.GetID())
  
@@ -399,8 +400,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   INPUT_VOLUME = "InputVolume"
   OUTPUT_TABLE = "OutputTable"
   CLASSIFICATION = "Classification"
-  CLASS_LABEL_0 = "White"
-  CLASS_LABEL_1 = "Blue"
+  CLASS_LABEL_0 = "Desk"
+  CLASS_LABEL_1 = "Cork"
   CLASS_LABEL_NONE = "WeakSignal"
 
   def __init__(self):
@@ -412,8 +413,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # ###
     slicer.mymodLog = self
     path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
-    # filename = "KNN_TestModel.joblib" 
-    filename = "KNN_BlueVsWhite.joblib" 
+    filename = "KNN_TestModel.joblib" 
+    # filename = "KNN_BlueVsWhite.joblib" 
+    # filename = "KNN_CardboardVsTeaBox.joblib" 
     self.model = load(path + filename)
 
 
@@ -569,16 +571,23 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
 
   def classifySpectra(self,X_test):
-    # Get the max value in X_test
+    # Get the max value in X_test to see if we will classify or not
     max_value = np.amax(X_test[:,1])
-    # Shape of X_test
-    # shape = X_test.shape
-    # print("Max value: {0}".format(max_value))
-    # print("Shape: {0}".format(shape))
+
+    # # Subtract the baseline from the data
+    # path = 'C:/OpticalSpectroscopy_TissueClassification/raw_data/'
+    # file_name = 'white_baseline.csv'
+    # baseline_pap = IO.loadSpectrum(path, file_name, 'Wavelength', start_index=774)
+    # baseline = baseline_pap[:-1,:]
+    # baseline = process.normalize(baseline)[:,1] 
     
-    X_test = self.normalize(X_test)
+    # X_test = process.normalize(X_test)
+    # X_test[:,1] = X_test[:,1] - baseline
+
+    X_test = process.normalize(X_test)
     X_test = X_test[:,1].reshape(1,-1)
     predicted = self.model.predict(X_test)
+    print(predicted)
     if max_value < 0.1:
       label = self.CLASS_LABEL_NONE
     elif predicted[0] == 0:
@@ -590,20 +599,20 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     parameterNode.SetParameter(self.CLASSIFICATION, label)
     return predicted, label
 
-  # Normalize peak instensity to 1.0
-  def normalize(self,data):
-    temp = data.copy()
-    if len(temp.shape) == 2:
-        temp[:,1] = (temp[:,1] - min(temp[:,1]))
-        temp[:,1] = temp[:,1]/max(temp[:,1])
-    elif len(temp.shape) == 3:
-        for i in range(len(temp)):
-            temp[i,:,1] = (temp[i,:,1] - min(temp[i,:,1]))
-            temp[i,:,1] = temp[i,:,1]/max(temp[i,:,1])
-    else:
-        print('Error, array dimension is not 2 or 3')     
-    return temp
-
+  # # Normalize peak instensity to 1.0
+  # def normalize(self,data):
+  #   temp = data.copy()
+  #   if len(temp.shape) == 2:
+  #       temp[:,1] = (temp[:,1] - min(temp[:,1]))
+  #       temp[:,1] = temp[:,1]/max(temp[:,1])
+  #   elif len(temp.shape) == 3:
+  #       for i in range(len(temp)):
+  #           temp[i,:,1] = (temp[i,:,1] - min(temp[i,:,1]))
+  #           temp[i,:,1] = temp[i,:,1]/max(temp[i,:,1])
+  #   else:
+  #       print('Error, array dimension is not 2 or 3')     
+  #   return temp
+  
 
 #
 # BroadbandSpecModuleTest

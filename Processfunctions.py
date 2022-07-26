@@ -8,11 +8,11 @@ This library is supposed to contain all functions which alter / process the data
 
 # Import all of the requried libraries
 import numpy as np
-import SimpleITK as sitk
-import matplotlib.pyplot as plt
-import pandas as pd
+# import SimpleITK as sitk
+# import matplotlib.pyplot as plt
+# import pandas as pd
 # import statistics
-from statistics import mode,mean
+# from statistics import mode,mean
 from scipy import interpolate
 
 
@@ -32,6 +32,7 @@ def normalize(data):
  
 def subtractBaseline(data,baseline):
     temp = data.copy()
+    
     for i in range(len(temp)):
-        temp[i] = temp[i]-baseline
+        temp[i,:,1] = temp[i,:,1]-baseline
     return temp
