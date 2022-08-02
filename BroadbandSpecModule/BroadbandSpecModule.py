@@ -11,7 +11,7 @@ import numpy as np
 from joblib import dump, load
 import sklearn
 import Processfunctions as process
-import IOfunctions as IO
+# import IOfunctions as IO
 
 #
 # BroadbandSpecModule
@@ -90,29 +90,123 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.ui.clearControlPointsButton.connect('clicked(bool)', self.onClearControlPointsButtonClicked)
     self.ui.spectrumImageSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onSpectrumImageChanged)
     self.ui.outputTableSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onOutputTableChanged)
-
+    self.ui.clearLastPointButton.connect('clicked(bool)', self.onClearLastPointButtonClicked)
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
 
   # My functions
-  def onModelFileSelectorChanged(self):
-    self.updateParameterNodeFromGUI()
-    # get the file from the modelFileSelector
-    modelPath = self.ui.modelFileSelector.currentPath
-    # update the parameter node with the new model path
-    parameterNode = self.logic.getParameterNode()
-    parameterNode.SetParameter('modelPath', modelPath)
-    print('Loading in:', modelPath)
-    if not (modelPath == ''): 
-      self.logic.model = load(modelPath)
-    # set the default currentPath to the modelFileSelector
-    
+
+  def onConnectButtonClicked(self):
+    '''
+    This function creates the IGTL connection for the Spectrometer and the EMT 
+    '''
+    nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
+    if nodeList == []: # if there are no nodes, create one for each device
+      connectorNode_Spec = slicer.vtkMRMLIGTLConnectorNode()
+      connectorNode_Spec.SetName('IGTLConnector_Spec')
+      connectorNode_EMT = slicer.vtkMRMLIGTLConnectorNode()
+      connectorNode_EMT.SetName('IGTLConnector_EMT')
+      slicer.mrmlScene.AddNode(connectorNode_Spec)
+      slicer.mrmlScene.AddNode(connectorNode_EMT)
+      connectorNode_Spec.SetTypeClient('localhost', 18944)
+      connectorNode_EMT.SetTypeClient('localhost', 18945)
+      connectorNode_Spec.Start()
+      connectorNode_EMT.Start()
+      self.ui.connectButton.text = 'Disconnect'
+    else:
+      connectorNode_Spec = nodeList[0]
+      connectorNode_EMT = nodeList[1]
+      if connectorNode_Spec.GetState() == 0:
+        connectorNode_Spec.Start()
+        connectorNode_EMT.Start()
+        self.ui.connectButton.text = 'Disconnect'
+      else:
+        connectorNode_Spec.Stop()
+        connectorNode_EMT.Stop()
+        self.ui.connectButton.text = 'Connect' 
 
   def onSpectrumImageChanged(self):
     self.updateParameterNodeFromGUI()
 
   def onOutputTableChanged(self):
     self.updateParameterNodeFromGUI()
+
+  def onModelFileSelectorChanged(self):
+    # Uparate the parameter node from the GUI
+    self.updateParameterNodeFromGUI()
+    # get the file from the modelFileSelector
+    modelPath = self.ui.modelFileSelector.currentPath
+    # update the parameter node with the new model path
+    parameterNode = self.logic.getParameterNode()
+    parameterNode.SetParameter(self.logic.MODEL_PATH, modelPath)
+    print('Loading in model from path:', modelPath)
+    if not (modelPath == ''): 
+      self.logic.model = load(modelPath)
+    # set the default currentPath to the modelFileSelector
+
+  def setEnablePlotting(self, enable):
+    if enable:
+      self.logic.startPlotting()
+    else:
+      self.logic.stopPlotting()
+
+  def onClearLastPointButtonClicked(self):
+    # Check to see if the lists exist, and if not create them
+    self.setupLists()
+
+    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
+    parameterNode = self.logic.getParameterNode()
+    # lastPointClass = parameterNode.GetParameter('LastPointAdded')
+    # if lastPointClass == self.logic.CLASS_LABEL_0:
+    #   # remove the Nth control point
+    #   pointListGreen_World.RemoveNthControlPoint(pointListGreen_World.GetNumberOfControlPoints()-1)
+    # elif lastPointClass == self.logic.CLASS_LABEL_1:
+    #   pointListRed_World.RemoveNthControlPoint(pointListRed_World.GetNumberOfControlPoints()-1)
+    pass
+
+  def onClearControlPointsButtonClicked(self):
+    # Check to see if the lists exist, and if not create them
+    self.setupLists()
+    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
+    pointListGreen_World.RemoveAllMarkups()
+    pointListRed_World.RemoveAllMarkups()
+
+  def onAddControlPointButtonClicked(self):
+    '''  
+    # Get the required nodes
+    - EMT transform
+    - pointList
+    '''
+    # Check to see if the lists exist, and if not create them
+    self.setupLists()
+    # Get the required nodes
+    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
+    pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
+
+    # The the tip of the probe in world coordinates
+    pos = [0,0,0,0]
+    pointList_EMT.GetNthFiducialWorldCoordinates(0,pos)
+    tip_World = pos[:-1]
+
+    # Add control point at tip of probe based on classification
+    spectrumArray = self.logic.updateOutputTable()
+    self.logic.classifySpectra(spectrumArray[743:-1,:]) # Magic Number **
+    parameterNode = self.logic.getParameterNode()
+    spectrumLabel = parameterNode.GetParameter(self.logic.CLASSIFICATION)
+
+    if spectrumLabel == self.logic.CLASS_LABEL_0:
+      pointListGreen_World.AddControlPoint(tip_World)
+      # set label of the control point to ''
+      pointListGreen_World.SetNthControlPointLabel(pointListGreen_World.GetNumberOfControlPoints()-1, '')
+      # parameterNode.SetParameter('LastPointAdded', self.logic.CLASS_LABEL_0)
+      
+    elif spectrumLabel == self.logic.CLASS_LABEL_1:
+      pointListRed_World.AddControlPoint(tip_World)
+      pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
+      # parameterNode.SetParameter('LastPointAdded', self.logic.CLASS_LABEL_1)
 
   def setupLists(self):
     '''
@@ -149,105 +243,8 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
       pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
     pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
-
-  def onClearControlPointsButtonClicked(self):
-    # Check to see if the lists exist, and if not create them
-    self.setupLists()
-    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
-    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
-    pointListGreen_World.RemoveAllMarkups()
-    pointListRed_World.RemoveAllMarkups()
-
-  def onAddControlPointButtonClicked(self):
-    '''  
-    # Get the required nodes
-    - EMT transform
-    - pointList
-    '''
-    # Check to see if the lists exist, and if not create them
-    self.setupLists()
-    # Get the required nodes
-    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
-    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
-    pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
-
-    '''
-    # This is creating a pseudo EMT transform 
-    if slicer.mrmlScene.GetFirstNodeByName('EMT2WorldTransform') == None:
-      EMT2WorldTransform = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
-      EMT2WorldTransform.SetName('EMT2WorldTransform')
-      # EMT2WorldTransform.SetAndObserveTransformNodeID(EMT2WorldTranform.GetID())
-    EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("EMT2WorldTransform")
-    EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
-    EMT2WorldMat.SetElement(0,3,20 + 5*np.random.uniform(-1,1))
-    EMT2WorldMat.SetElement(1,3,20 + 5*np.random.uniform(-1,1))
-    EMT2WorldMat.SetElement(2,3,20 + 5*np.random.uniform(-1,1))
-    EMT2WorldTransform = slicer.mrmlScene.GetFirstNodeByName("ReferenceToTracker")
-    print('Adding control point')
-    # Get the current position of the EMT origin. This is just the translational component of the transform
-    EMT2WorldMat = EMT2WorldTransform.GetMatrixTransformToParent()
-    tip_World = EMT2WorldMat.MultiplyPoint(np.array([0,0,0,1]))
-     '''
-
-    # The the tip of the probe in world coordinates
-    pos = [0,0,0,0]
-    pointList_EMT.GetNthFiducialWorldCoordinates(0,pos)
-    tip_World = pos[:-1]
-
-    # Add control point at tip of probe based on classification
-    spectrumArray = self.logic.updateOutputTable()
-    self.logic.classifySpectra(spectrumArray[743:-1,:]) # Magic Number **
-    parameterNode = self.logic.getParameterNode()
-    spectrumLabel = parameterNode.GetParameter(self.logic.CLASSIFICATION)
-
-    if spectrumLabel == self.logic.CLASS_LABEL_0:
-      # print('Placing Green Point')
-      pointListGreen_World.AddControlPoint(tip_World)
-      # set label of the control point to ''
-      pointListGreen_World.SetNthControlPointLabel(pointListGreen_World.GetNumberOfControlPoints()-1, '')
-    elif spectrumLabel == self.logic.CLASS_LABEL_1:
-      # print('Placing Red Point')
-      pointListRed_World.AddControlPoint(tip_World)
-      pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
-
-  def setEnablePlotting(self, enable):
-    # print('Enable Value:',enable)
-    if enable:
-      # print('Enabling plotting')
-      self.logic.startPlotting()
-    else:
-      # print('Disabling plotting')
-      self.logic.stopPlotting()
-
-  def onConnectButtonClicked(self):
-    '''
-    This function creates the IGTL connection for the Spectrometer and the EMT 
-    '''
-    nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
-    if nodeList == []: # if there are no nodes, create one for each device
-      connectorNode_Spec = slicer.vtkMRMLIGTLConnectorNode()
-      connectorNode_Spec.SetName('IGTLConnector_Spec')
-      connectorNode_EMT = slicer.vtkMRMLIGTLConnectorNode()
-      connectorNode_EMT.SetName('IGTLConnector_EMT')
-      slicer.mrmlScene.AddNode(connectorNode_Spec)
-      slicer.mrmlScene.AddNode(connectorNode_EMT)
-      connectorNode_Spec.SetTypeClient('localhost', 18944)
-      connectorNode_EMT.SetTypeClient('localhost', 18945)
-      connectorNode_Spec.Start()
-      connectorNode_EMT.Start()
-      self.ui.connectButton.text = 'Disconnect'
-    else:
-      connectorNode_Spec = nodeList[0]
-      connectorNode_EMT = nodeList[1]
-      if connectorNode_Spec.GetState() == 0:
-        connectorNode_Spec.Start()
-        connectorNode_EMT.Start()
-        self.ui.connectButton.text = 'Disconnect'
-      else:
-        connectorNode_Spec.Stop()
-        connectorNode_EMT.Stop()
-        self.ui.connectButton.text = 'Connect' 
-
+ 
+  
   # Predefined functions
   
   def setParameterNode(self, inputParameterNode):
@@ -270,6 +267,36 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     # Initial GUI update
     self.updateGUIFromParameterNode()
+
+  def initializeParameterNode(self):
+    """
+    Ensure parameter node exists and observed.
+    """
+    # Parameter node stores all user choices in parameter values, node selections, etc.
+    # so that when the scene is saved and reloaded, these settings are restored.
+    self.setParameterNode(self.logic.getParameterNode())
+
+    # Select default input nodes if nothing is selected yet to save a few clicks for the user
+    if not self._parameterNode.GetNodeReference(self.logic.INPUT_VOLUME):
+      firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
+      if firstVolumeNode:
+        self._parameterNode.SetNodeReferenceID(self.logic.INPUT_VOLUME, firstVolumeNode.GetID())
+
+    # If no table selection exists, create one and select it
+    if not self._parameterNode.GetNodeReference(self.logic.OUTPUT_TABLE):
+      # if a table node is not selected, create a new one
+      firstTableNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLTableNode")
+      if not firstTableNode:
+        firstTableNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLTableNode")
+        firstTableNode.SetName('Table')
+        slicer.mrmlScene.AddNode(firstTableNode)
+      if firstTableNode:
+        self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, firstTableNode.GetID())
+
+    # If no model path is selected, select the default one
+    if not self._parameterNode.GetNodeReference(self.logic.MODEL_PATH):
+      defaultModelPath = 'C:/OpticalSpectroscopy_TissueClassification/Models/KNN_TestModel.joblib' # Hardcoded path
+      self._parameterNode.SetParameter(self.logic.MODEL_PATH, defaultModelPath)
 
   def updateGUIFromParameterNode(self, caller=None, event=None):
     """
@@ -298,10 +325,12 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.ui.connectButton.text = 'Connect'
       else:
         self.ui.connectButton.text = 'Disconnect' 
-    
-    # Update Checkbox state
-    # self.ui.enablePlottingCheckBox.setChecked(self._parameterNode.GetParameter('EnablePlotting'))
 
+    # Update the model path to be the last selection
+    if self.ui.modelFileSelector.currentPath == '':
+      # set the current path to whatever is stored in the parameter node
+      self.ui.modelFileSelector.currentPath = self._parameterNode.GetParameter(self.logic.MODEL_PATH)
+  
     # All the GUI updates are done
     self._updatingGUIFromParameterNode = False
 
@@ -318,40 +347,17 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     self._parameterNode.SetNodeReferenceID(self.logic.INPUT_VOLUME, self.ui.spectrumImageSelector.currentNodeID)
     self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, self.ui.outputTableSelector.currentNodeID)
-    
+    parameterNode = self.logic.getParameterNode()
+    parameterNode.SetParameter(self.logic.MODEL_PATH, self.ui.modelFileSelector.currentPath)
+
     self._parameterNode.EndModify(wasModified)
 
-  def initializeParameterNode(self):
-    """
-    Ensure parameter node exists and observed.
-    """
-    # Parameter node stores all user choices in parameter values, node selections, etc.
-    # so that when the scene is saved and reloaded, these settings are restored.
-    # print('Initializing parameter node...')
-    self.setParameterNode(self.logic.getParameterNode())
 
-    # Select default input nodes if nothing is selected yet to save a few clicks for the user
-    if not self._parameterNode.GetNodeReference(self.logic.INPUT_VOLUME):
-      firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
-      if firstVolumeNode:
-        self._parameterNode.SetNodeReferenceID(self.logic.INPUT_VOLUME, firstVolumeNode.GetID())
-
-    # If no table selection exists, create one and select it
-    if not self._parameterNode.GetNodeReference(self.logic.OUTPUT_TABLE):
-      # if a table node is not selected, create a new one
-      firstTableNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLTableNode")
-      if not firstTableNode:
-        firstTableNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLTableNode")
-        firstTableNode.SetName('Table')
-        slicer.mrmlScene.AddNode(firstTableNode)
-      if firstTableNode:
-        self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, firstTableNode.GetID())
  
   def cleanup(self):
     """
     Called when the application closes and the module widget is destroyed.
     """
-    # print the observer list
     self.logic.removeObservers()
   
   def enter(self):
@@ -400,8 +406,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   INPUT_VOLUME = "InputVolume"
   OUTPUT_TABLE = "OutputTable"
   CLASSIFICATION = "Classification"
-  CLASS_LABEL_0 = "Desk"
-  CLASS_LABEL_1 = "Cork"
+  MODEL_PATH = "ModelPath"
+  CLASS_LABEL_0 = "ClassLabel0"
+  CLASS_LABEL_1 = "ClassLabel1"
   CLASS_LABEL_NONE = "WeakSignal"
 
   def __init__(self):
@@ -412,11 +419,13 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     self.observerTags = [] # This is reset when the module is reloaded. But not all observers are removed.
     # ###
     slicer.mymodLog = self
-    path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
-    filename = "KNN_TestModel.joblib" 
+    # path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
+    # filename = "KNN_TestModel.joblib" 
     # filename = "KNN_BlueVsWhite.joblib" 
     # filename = "KNN_CardboardVsTeaBox.joblib" 
-    self.model = load(path + filename)
+    # self.model = load(path + filename)
+    self.model = None
+
 
 
   def setDefaultParameters(self, parameterNode):
@@ -425,6 +434,17 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     """
     if not parameterNode.GetParameter(self.CLASSIFICATION):
       parameterNode.SetParameter(self.CLASSIFICATION, '')
+    # if the self.model path is not set, grab it from the ctkPathLineEdit widget
+    if parameterNode.GetParameter(self.MODEL_PATH) == '':
+      parameterNode.SetParameter(self.MODEL_PATH, 'C:/OpticalSpectroscopy_TissueClassification/Models/KNN_TestModel.joblib') # Hardcoded path
+    # print("Model path1: " + parameterNode.GetParameter(self.MODEL_PATH))
+    # print(self.model)
+    if self.model == None:
+      # parameterNode = self.getParameterNode()
+      modelPath = parameterNode.GetParameter(self.MODEL_PATH)
+      # print("Model path2: " + parameterNode.GetParameter(self.MODEL_PATH))
+      self.model = load(modelPath)
+
     if not parameterNode.GetParameter("Threshold"):
       parameterNode.SetParameter("Threshold", "100.0")
     if not parameterNode.GetParameter("Invert"):
@@ -467,19 +487,17 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     if spectrumImageNode:
-      print("Add observer to {0}".format(spectrumImageNode.GetName()))
+      # print("Add observer to {0}".format(spectrumImageNode.GetName()))
       self.observerTags.append([spectrumImageNode, spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified)])
-      # print('The observer index: ',spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified))
 
   # This function does not work correctly as the plot continues to plot. ***
   def removeObservers(self):
-    # print("Remove observers")
     for nodeTagPair in self.observerTags:
       nodeTagPair[0].RemoveObserver(nodeTagPair[1])
 
   def startPlotting(self):
-    # Change the layout to one that has a chart.
     print("Start plotting")
+    # Change the layout to one that has a chart.
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
     ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalPlotView)
     self.removeObservers()  
@@ -488,11 +506,11 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     self.onSpectrumImageNodeModified(0,0)
 
   def stopPlotting(self):
-    print("Stop plotting")
+    print("Stopped plotting")
     # Set layout to conventional widescreen
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
-    # ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUp3DView)
-    ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalWidescreenView)
+    ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUp3DView)
+    # ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalWidescreenView)
     self.removeObservers()  
 
   def onSpectrumImageNodeModified(self, observer, eventid):
@@ -587,7 +605,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     X_test = process.normalize(X_test)
     X_test = X_test[:,1].reshape(1,-1)
     predicted = self.model.predict(X_test)
-    print(predicted)
     if max_value < 0.1:
       label = self.CLASS_LABEL_NONE
     elif predicted[0] == 0:
@@ -598,20 +615,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     parameterNode = self.getParameterNode()
     parameterNode.SetParameter(self.CLASSIFICATION, label)
     return predicted, label
-
-  # # Normalize peak instensity to 1.0
-  # def normalize(self,data):
-  #   temp = data.copy()
-  #   if len(temp.shape) == 2:
-  #       temp[:,1] = (temp[:,1] - min(temp[:,1]))
-  #       temp[:,1] = temp[:,1]/max(temp[:,1])
-  #   elif len(temp.shape) == 3:
-  #       for i in range(len(temp)):
-  #           temp[i,:,1] = (temp[i,:,1] - min(temp[i,:,1]))
-  #           temp[i,:,1] = temp[i,:,1]/max(temp[i,:,1])
-  #   else:
-  #       print('Error, array dimension is not 2 or 3')     
-  #   return temp
   
 
 #

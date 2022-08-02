@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>BroadbandSpec_test</class>
- <widget class="qMRMLWidget" name="BroadbandSpec_test">
+ <class>ClearLastPointButton</class>
+ <widget class="qMRMLWidget" name="ClearLastPointButton">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>384</width>
+    <width>558</width>
     <height>300</height>
    </rect>
   </property>
@@ -96,17 +96,34 @@
         </property>
        </widget>
       </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>Enable Plotting</string>
+      <item row="3" column="1">
+       <widget class="ctkPathLineEdit" name="modelFileSelector">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="acceptDrops">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
-      <item row="3" column="1">
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Select Model Path</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
        <widget class="QCheckBox" name="enablePlottingCheckBox">
         <property name="text">
          <string/>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_6">
+        <property name="text">
+         <string>Enable Plotting</string>
         </property>
        </widget>
       </item>
@@ -114,19 +131,19 @@
     </widget>
    </item>
    <item>
-    <widget class="ctkPathLineEdit" name="modelFileSelector">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="acceptDrops">
-      <bool>true</bool>
+    <widget class="QPushButton" name="addControlPointButton">
+     <property name="text">
+      <string>Add Control Point at Tool Tip</string>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="addControlPointButton">
+    <widget class="QPushButton" name="clearLastPointButton">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="text">
-      <string>Add Control Point at Tool Tip</string>
+      <string>Clear Last Point</string>
      </property>
     </widget>
    </item>
@@ -179,7 +196,7 @@
  <resources/>
  <connections>
   <connection>
-   <sender>BroadbandSpec_test</sender>
+   <sender>ClearLastPointButton</sender>
    <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
    <receiver>spectrumImageSelector</receiver>
    <slot>setMRMLScene(vtkMRMLScene*)</slot>
@@ -195,7 +212,7 @@
    </hints>
   </connection>
   <connection>
-   <sender>BroadbandSpec_test</sender>
+   <sender>ClearLastPointButton</sender>
    <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
    <receiver>outputTableSelector</receiver>
    <slot>setMRMLScene(vtkMRMLScene*)</slot>
