@@ -7,14 +7,14 @@
     <x>0</x>
     <y>0</y>
     <width>558</width>
-    <height>300</height>
+    <height>330</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
      <property name="text">
-      <string>Parameters</string>
+      <string>Setup</string>
      </property>
      <layout class="QFormLayout" name="formLayout_2">
       <item row="0" column="0">
@@ -96,6 +96,13 @@
         </property>
        </widget>
       </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Select Model Path</string>
+        </property>
+       </widget>
+      </item>
       <item row="3" column="1">
        <widget class="ctkPathLineEdit" name="modelFileSelector">
         <property name="enabled">
@@ -106,28 +113,27 @@
         </property>
        </widget>
       </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Select Model Path</string>
-        </property>
-       </widget>
-      </item>
       <item row="4" column="1">
-       <widget class="QCheckBox" name="enablePlottingCheckBox">
-        <property name="text">
-         <string/>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_6">
+       <widget class="QPushButton" name="enablePlottingButton">
         <property name="text">
          <string>Enable Plotting</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
      </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="scanButton">
+     <property name="text">
+      <string>Start Scanning</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
     </widget>
    </item>
    <item>
@@ -138,19 +144,19 @@
     </widget>
    </item>
    <item>
+    <widget class="QPushButton" name="clearControlPointsButton">
+     <property name="text">
+      <string>Clear Points</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QPushButton" name="clearLastPointButton">
      <property name="enabled">
       <bool>false</bool>
      </property>
      <property name="text">
       <string>Clear Last Point</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QPushButton" name="clearControlPointsButton">
-     <property name="text">
-      <string>Clear Points</string>
      </property>
     </widget>
    </item>
