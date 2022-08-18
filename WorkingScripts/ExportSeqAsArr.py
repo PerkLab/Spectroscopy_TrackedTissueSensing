@@ -9,7 +9,7 @@ label = 1
 # This code is used to access a sequence from slicer and convert it to a numpy array to later export
 seqNode  = slicer.mrmlScene.GetFirstNodeByName('Sequence')
 # The sequence contains n data nodes
-name = 'teaBox'
+name = 'PorkTest'
 folder = 'C:/OpticalSpectroscopy_TissueClassification/broadbandTestData/' + name + '/'
 
 for idx in range(seqNode.GetNumberOfDataNodes()):

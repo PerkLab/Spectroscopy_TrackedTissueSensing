@@ -1,14 +1,16 @@
 import logging
-import os
-import unittest
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-
-import numpy as np
-from joblib import dump, load
 import sklearn
+import numpy as np
 # This is a custom library which slicer doesnt recognize on startup
+try: 
+  from joblib import load
+except:
+  slicer.util.pip_install('joblib')
+  pass
+
 try:
   import Processfunctions as process
 except:
@@ -377,7 +379,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   CLASS_LABEL_NONE = "WeakSignal"
   SCANNING_STATE = 'Scanning State'
   PLOTTING_STATE = 'Plotting State'
-  DISTANCE_THRESHOLD = 3
+  DISTANCE_THRESHOLD = 2 # in mm
 
   def __init__(self):
     """
@@ -493,14 +495,32 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
 
     # The the tip of the probe in world coordinates
-    pos = [0,0,0,0]
-    pointList_EMT.GetNthFiducialWorldCoordinates(0,pos)
-    tip_World = pos[:-1]
-
+    pos = [0,0,0]
+    pointList_EMT.GetNthControlPointPositionWorld(0,pos)
+    tip_World = pos
+    '''
+    # # Get the tip of the probe in the reference frame coordinates
+    # ProbeTipToProbe = slicer.mrmlScene.GetFirstNodeByName("ProbeTiptoProbe")
+    # ProbeToTracker = slicer.mrmlScene.GetFirstNodeByName("ProbeToTracker")
+    # TrackerToReference = slicer.mrmlScene.GetFirstNodeByName("ReferenceToTracker (-)")
+    # probeTip_ProbeTip = [0,0,0,0]
+    # print("probeTip_ProbeTip: " + str(probeTip_ProbeTip))
+    # probeTip_Probe = ProbeTipToProbe.GetMatrixTransformToParent().MultiplyPoint(probeTip_ProbeTip)
+    # print("probeTip_Probe: " + str(probeTip_Probe))
+    # probeTip_Tracker = ProbeToTracker.GetMatrixTransformToParent().MultiplyPoint(probeTip_Probe)
+    # print("ProbeTip_Tracker: " + str(probeTip_Tracker))
+    # probeTip_Reference = TrackerToReference.GetMatrixTransformToParent().MultiplyPoint(probeTip_Tracker)
+    # print("ProbeTip_Reference: " + str(probeTip_Reference))
+    # tip_World = probeTip_Reference[:-1]
+    '''
     # Add control point at tip of probe based on classification
-    spectrumArray = self.updateOutputTable()
-    self.classifySpectra(spectrumArray[743:-1,:]) # Magic Number **
     parameterNode = self.getParameterNode()
+    spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    # Convert image to volume 
+    specArray = slicer.util.arrayFromVolume(spectrumImageNode)
+    specArray = np.squeeze(specArray)
+    specArray = np.transpose(specArray)
+    self.classifySpectra(specArray[743:-1,:]) # Magic Number ** Also this is very slow to compute
     spectrumLabel = parameterNode.GetParameter(self.CLASSIFICATION)
 
     if spectrumLabel == self.CLASS_LABEL_0:
@@ -513,6 +533,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
       # parameterNode.SetParameter('LastPointAdded', self.logic.CLASS_LABEL_1)
     else:
+      # For fiducial registraion purposes, we need to add a control point at the tip of the probe
+      # pointListRed_World.AddControlPoint(tip_World)
+      # pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
       pass
 
   def onSpectrumImageNodeModified(self, observer, eventid):
@@ -529,6 +552,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       spectrumArray = self.updateOutputTable()
       self.classifySpectra(spectrumArray[743:-1,:]) # Magic Number **
       self.updateChart()
+      pass
 
     # If the enable scanning button is checked
     if parameterNode.GetParameter(self.SCANNING_STATE) == "True":
@@ -537,22 +561,30 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       # if the red and green point lists are both empty
       if pointListRed_World.GetNumberOfControlPoints() == 0 and pointListGreen_World.GetNumberOfControlPoints() == 0:
         self.addControlPointToToolTip()
+        pass
       # Else check the distance beween the last control point and the tip of the probe
       else:
         # The the tip of the probe in world coordinates
-        pos = [0,0,0,0]
+        pos = [0,0,0]
         pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
-        pointList_EMT.GetNthFiducialWorldCoordinates(0,pos)
-        tip_World = pos[:-1]
-        
+        pointList_EMT.GetNthControlPointPositionWorld(0,pos)
+        # # Transform the point from world to referenece coordinates
+        # TrackerToReferenceNode = slicer.mrmlScene.GetFirstNodeByName("ReferenceToTracker (-)")
+        # pos = TrackerToReferenceNode.GetMatrixTransformToParent().MultiplyPoint(pos)
+        tip_World = pos
+            
         # Get the last control point of green in world coordinates
-        pos = [0,0,0,0]
-        pointListGreen_World.GetNthFiducialWorldCoordinates(pointListGreen_World.GetNumberOfControlPoints()-1,pos)
-        lastPointGreen_World = pos[:-1]
+        pos = [0,0,0]
+        pointListGreen_World.GetNthControlPointPositionWorld(pointListGreen_World.GetNumberOfControlPoints()-1,pos)
+        # # Transform the point from world to referenece coordinates
+        # pos = TrackerToReferenceNode.GetMatrixTransformToParent().MultiplyPoint(pos)
+        lastPointGreen_World = pos
         # Get the last control point of red in world coordinates
-        pos = [0,0,0,0]
-        pointListRed_World.GetNthFiducialWorldCoordinates(pointListRed_World.GetNumberOfControlPoints()-1,pos)
-        lastPointRed_World = pos[:-1]
+        pos = [0,0,0]
+        pointListRed_World.GetNthControlPointPositionWorld(pointListRed_World.GetNumberOfControlPoints()-1,pos)
+        # # Transform the point from world to referenece coordinates
+        # pos = TrackerToReferenceNode.GetMatrixTransformToParent().MultiplyPoint(pos)
+        lastPointRed_World = pos
 
         # Get the distance between the tip and the last control point
         distanceRed = np.linalg.norm(np.subtract(tip_World, lastPointGreen_World))
@@ -562,6 +594,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
         # print("Distance Red: {0}".format(distanceRed))
         if distanceRed > self.DISTANCE_THRESHOLD and distanceGreen > self.DISTANCE_THRESHOLD:
           self.addControlPointToToolTip()
+          pass
  
   def setupLists(self):
       '''
@@ -600,7 +633,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
   
   def updateOutputTable(self):
-        # Get the table created by the selector
+    # Get the table created by the selector
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     tableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
@@ -664,7 +697,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   def classifySpectra(self,X_test):
     # Get the max value in X_test to see if we will classify or not
     max_value = np.amax(X_test[:,1])
-
     # # Subtract the baseline from the data
     # path = 'C:/OpticalSpectroscopy_TissueClassification/raw_data/'
     # file_name = 'white_baseline.csv'
