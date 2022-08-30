@@ -98,6 +98,8 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.ui.spectrumImageSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onSpectrumImageChanged)
     self.ui.outputTableSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onOutputTableChanged)
     self.ui.modelFileSelector.connect('currentPathChanged(QString)', self.onModelFileSelectorChanged)
+    self.ui.placeFiducialButton.connect('clicked(bool)', self.onPlaceFiducialButtonClicked)
+
     self.ui.enablePlottingButton.connect('clicked(bool)', self.setEnablePlotting)
     self.ui.scanButton.connect('clicked(bool)', self.onScanButtonClicked)
     self.ui.addControlPointButton.connect('clicked(bool)', self.onAddControlPointButtonClicked)
@@ -155,6 +157,10 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     print('Loading in model from path:', modelPath)
     if not (modelPath == ''): 
       self.logic.model = load(modelPath)
+
+  def onPlaceFiducialButtonClicked(self):
+    self.updateParameterNodeFromGUI()
+    self.logic.placeFiducial()
 
   def setEnablePlotting(self, enable):
     self.updateParameterNodeFromGUI()
@@ -256,7 +262,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     # If no model path is selected, select the default one
     if not self._parameterNode.GetNodeReference(self.logic.MODEL_PATH):
-      defaultModelPath = 'C:/OpticalSpectroscopy_TissueClassification/Models/KNN_TestModel.joblib' # Hardcoded path
+      defaultModelPath = 'C:/OpticalSpectroscopy_TissueClassification/Models/KNN_WhiteVsBlue2.joblib' # Hardcoded path
       self._parameterNode.SetParameter(self.logic.MODEL_PATH, defaultModelPath)
 
   def updateGUIFromParameterNode(self, caller=None, event=None):
@@ -461,6 +467,20 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     for nodeTagPair in self.observerTags:
       nodeTagPair[0].RemoveObserver(nodeTagPair[1])
 
+  def placeFiducial(self):
+    """
+    Place a fiducial at the tool tip.
+    """
+    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT")
+
+    # The the tip of the probe in world coordinates
+    pos = [0,0,0]
+    pointList_EMT.GetNthControlPointPositionWorld(0,pos)
+    tip_World = pos
+    pointListGreen_World.AddControlPoint(tip_World)
+    pointListGreen_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
+
   def startPlotting(self):
     print("Start plotting")
     # Change the layout to one that has a chart.
@@ -532,11 +552,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       pointListRed_World.AddControlPoint(tip_World)
       pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
       # parameterNode.SetParameter('LastPointAdded', self.logic.CLASS_LABEL_1)
-    else:
-      # For fiducial registraion purposes, we need to add a control point at the tip of the probe
-      # pointListRed_World.AddControlPoint(tip_World)
-      # pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
-      pass
 
   def onSpectrumImageNodeModified(self, observer, eventid):
     self.setupLists()

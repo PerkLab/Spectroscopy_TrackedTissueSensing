@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>558</width>
-    <height>330</height>
+    <height>340</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -114,16 +114,23 @@
        </widget>
       </item>
       <item row="4" column="1">
-       <widget class="QPushButton" name="enablePlottingButton">
+       <widget class="QPushButton" name="placeFiducialButton">
         <property name="text">
-         <string>Enable Plotting</string>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
+         <string>Place fiducial at tip</string>
         </property>
        </widget>
       </item>
      </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="enablePlottingButton">
+     <property name="text">
+      <string>Enable Plotting</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
     </widget>
    </item>
    <item>
@@ -137,16 +144,16 @@
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="addControlPointButton">
+    <widget class="QPushButton" name="clearControlPointsButton">
      <property name="text">
-      <string>Add Control Point at Tool Tip</string>
+      <string>Clear Points</string>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="clearControlPointsButton">
+    <widget class="QPushButton" name="addControlPointButton">
      <property name="text">
-      <string>Clear Points</string>
+      <string>Add Control Point at Tool Tip</string>
      </property>
     </widget>
    </item>
