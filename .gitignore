@@ -6,3 +6,6 @@
 /ModuleScene_calibratedModel3.mrb
 /src/__pycache__
 /BroadbandSpecModule/__pycache__
+/data
+/__pycache__
+/.ipynb_checkpoints
