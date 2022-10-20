@@ -122,31 +122,37 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     This function creates the IGTL connection for the Spectrometer and the EMT 
     '''
     self.updateParameterNodeFromGUI()
-    # *** Here I should check if a ROLE: Connector is saved to the parameter node. If there is nothing with that role then I know to create one and save the ID to the parameter node.
-    nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
-    if nodeList == []: # if there are no nodes, create one for each device *** I only need to create one now that i have merged the plus files.
-      connectorNode_Spec = slicer.vtkMRMLIGTLConnectorNode()
-      connectorNode_Spec.SetName('IGTLConnector_Spec')
-      connectorNode_EMT = slicer.vtkMRMLIGTLConnectorNode()
-      connectorNode_EMT.SetName('IGTLConnector_EMT')
-      slicer.mrmlScene.AddNode(connectorNode_Spec) # *** this should save the nodeID to the parameter node as well
-      slicer.mrmlScene.AddNode(connectorNode_EMT)
-      connectorNode_Spec.SetTypeClient('localhost', 18944)
-      connectorNode_EMT.SetTypeClient('localhost', 18945)
-      connectorNode_Spec.Start()
-      connectorNode_EMT.Start()
+    # Get parameter node
+    parameterNode = self.logic.getParameterNode()
+    # Get the connector node from the parameter node
+    connectorNode = parameterNode.GetNodeReference(self.logic.CONNECTOR)
+    # if the a connector node does not exist, create one
+    if connectorNode == None:
+      print('No connector node found, creating one')
+      # Create a connector node
+      connectorNode = slicer.vtkMRMLIGTLConnectorNode()
+      # print(connectorNode)
+      print(connectorNode.GetID())
+      # Set the connector node name
+      connectorNode.SetName('IGTLConnector_SpecEMT')
+      # Add the connector node to the scene
+      slicer.mrmlScene.AddNode(connectorNode) 
+      connectorNode.SetTypeClient('localhost', 18944)
+      connectorNode.Start()
       self.ui.connectButton.text = 'Disconnect'
+      # Save the node ID to the parameter node
+      parameterNode.SetNodeReferenceID(self.logic.CONNECTOR, connectorNode.GetID())
+      print(connectorNode.GetID())
+    # if connector node exists, update the text on the button
     else:
-      connectorNode_Spec = nodeList[0] # *** get things directly from parameter node
-      connectorNode_EMT = nodeList[1]
-      if connectorNode_Spec.GetState() == 0:
-        connectorNode_Spec.Start()
-        connectorNode_EMT.Start()
+      if connectorNode.GetState() == 0:
+        connectorNode.Start()
+        print('Connector node started')
         self.ui.connectButton.text = 'Disconnect'
       else:
-        connectorNode_Spec.Stop()
-        connectorNode_EMT.Stop()
-        self.ui.connectButton.text = 'Connect' 
+        connectorNode.Stop()
+        print('Connector node stopped')
+        self.ui.connectButton.text = 'Connect'
 
   def onSpectrumImageChanged(self):
     self.updateParameterNodeFromGUI()
@@ -400,6 +406,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   # ROLES
   POINTLISTGREEN_WORLD = 'pointListGreen_World'
   POINTLISTRED_WORLD = 'pointListRed_World'
+  CONNECTOR = 'Connector'
 
   DISTANCE_THRESHOLD = 2 # in mm
 
