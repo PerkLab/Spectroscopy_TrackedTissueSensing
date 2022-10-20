@@ -1,3 +1,4 @@
+from calendar import SATURDAY
 import logging
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
@@ -112,10 +113,50 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.ui.addControlPointButton.connect('clicked(bool)', self.onAddControlPointButtonClicked)
     self.ui.clearControlPointsButton.connect('clicked(bool)', self.onClearControlPointsButtonClicked)
     self.ui.clearLastPointButton.connect('clicked(bool)', self.onClearLastPointButtonClicked)
+
+    # *** When these change, simply update the parameter node
+    self.ui.dataClassSelector.connect('currentIndexChanged(int)', self.onDataClassSelectorChanged)
+    # add the options cancer and normal to the data class selector
+    self.ui.dataClassSelector.addItem("Cancer")
+    self.ui.dataClassSelector.addItem("Normal")
+    self.ui.sampleDurationSelector.connect('currentIndexChanged(int)', self.onSampleDurationSelectorChanged)
+    # add the options 0.5, 1, 2 to the sample duration selector
+    self.ui.sampleDurationSelector.addItem(0.5)
+    self.ui.sampleDurationSelector.addItem(1)
+    self.ui.sampleDurationSelector.addItem(2)
+
+    self.ui.sampleRateSelector.connect('currentIndexChanged(int)', self.onSampleRateSelectorChanged)
+    # add option 1, 10,100 to the sample rate selector
+    self.ui.sampleRateSelector.addItem(1)
+    self.ui.sampleRateSelector.addItem(10)
+    self.ui.sampleRateSelector.addItem(100)
+    self.ui.collectSampleButton.connect('clicked(bool)', self.onCollectSampleButtonClicked)
+
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
 
   # My functions
+  def onDataClassSelectorChanged(self):
+    self.updateParameterNodeFromGUI()
+    parameterNode = self.logic.getParameterNode()
+    dataClass = self.ui.dataClassSelector.currentText
+    parameterNode.SetParameter(self.logic.DATA_CLASS, dataClass)
+
+  def onSampleDurationSelectorChanged(self):
+    self.updateParameterNodeFromGUI()
+    parameterNode = self.logic.getParameterNode()
+    sampleDuration = self.ui.sampleDurationSelector.currentText
+    parameterNode.SetParameter(self.logic.SAMPLE_DURATION, sampleDuration)
+
+  def onSampleRateSelectorChanged(self):
+    self.updateParameterNodeFromGUI()
+    parameterNode = self.logic.getParameterNode()
+    sampleRate = self.ui.sampleRateSelector.currentText
+    parameterNode.SetParameter(self.logic.SAMPLE_PER_SECOND, sampleRate)
+
+  def onCollectSampleButtonClicked(self):
+    self.updateParameterNodeFromGUI()
+    self.logic.collectSample()
 
   def onConnectButtonClicked(self):
     '''
@@ -204,17 +245,9 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     #   pointListRed_World.RemoveNthControlPoint(pointListRed_World.GetNumberOfControlPoints()-1)
     pass
 
-  # This should certainly link to the logic class directly instead of performing the logic here ***
   def onClearControlPointsButtonClicked(self):
     self.updateParameterNodeFromGUI()
     self.logic.clearControlPoints()
-    # # Check to see if the lists exist, and if not create them
-    # self.logic.setupLists()
-    # # *** this should be done from parameter node
-    # pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
-    # pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
-    # pointListGreen_World.RemoveAllMarkups()
-    # pointListRed_World.RemoveAllMarkups()
 
   def onAddControlPointButtonClicked(self):
     self.updateParameterNodeFromGUI()
@@ -404,12 +437,18 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   CLASS_LABEL_NONE = "WeakSignal"
   SCANNING_STATE = 'Scanning State'
   PLOTTING_STATE = 'Plotting State'
-  # ROLES
-  POINTLISTGREEN_WORLD = 'pointListGreen_World'
-  POINTLISTRED_WORLD = 'pointListRed_World'
-  POINTLISTEMT = 'pointListEMT'
-  CONNECTOR = 'Connector'
+  SAMPLE_DURATION = "SampleDuration"
+  SAMPLE_PER_SECOND = "SampleRate"
+  DATA_CLASS = "DataClass"
 
+  # ROLES
+  POINTLIST_GREEN_WORLD = 'pointList_Green_World'
+  POINTLIST_RED_WORLD = 'pointList_Red_World'
+  POINTLIST_EMT = 'pointList_EMT'
+  CONNECTOR = 'Connector'
+  SAMPLE_SEQUENCE = 'SampleSequence'
+
+  # Constants
   DISTANCE_THRESHOLD = 2 # in mm
 
   def __init__(self):
@@ -533,8 +572,10 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     print("Stopped plotting")
     # Set layout to conventional widescreen
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
-    ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalPlotView)
+    # ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalPlotView)
     # ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUp3DView)
+    # set view to conventional
+    ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView)
     self.removeObservers()  
 
   def startScanning(self):
@@ -544,6 +585,33 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   def stopScanning(self):
     print('Stopping Scanning')
     pass
+
+  def collectSample(self):
+    # In this module I will collect X spectra over Y seconds using a sequence object
+    # I will then save them to a csv with the label given by the class selector
+    parameterNode = self.getParameterNode()
+
+    # If a sequence node does not exist in the parameter node, create one *** This should be in initialize parameter node
+    sampleSeqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
+    if sampleSeqNode == None:
+      # create a sequence node
+      sampleSeqNode = slicer.vtkMRMLSequenceNode()
+      slicer.mrmlScene.AddNode(sampleSeqNode)
+      sampleSeqNode.SetName("SampleSequence")
+      parameterNode.SetNodeReferenceID(self.SAMPLE_SEQUENCE, sampleSeqNode.GetID())
+
+    # Get the sequence node
+    sampleSeqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
+    # Get the class label
+    dataLabel = parameterNode.GetParameter(self.DATA_CLASS)
+    # Get the sampling duration
+    sampleDuration = parameterNode.GetParameter(self.SAMPLE_DURATION)
+    # Get the sampling frequency
+    sampleFrequency = parameterNode.GetParameter(self.SAMPLE_PER_SECOND)
+    # Record 1 second of data into the sample sequence node
+    self.recordSequence(sampleSeqNode, dataLabel, sampleDuration, sampleFrequency)
+
+    # clear the sequence
 
   def addControlPointToToolTip(self):
     # Get the required nodes
@@ -677,7 +745,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       if pointList_EMT.GetNumberOfControlPoints() == 0:
         pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
         pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
-
   
   def updateOutputTable(self):
     # Get the table created by the selector
@@ -700,11 +767,11 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     specArray = np.transpose(specArray)
 
     # Save results to a new table node
-    if slicer.util.getNodesByClass('vtkMRMLTableNode') == []:
+    if slicer.util.getNodesByClass('vtkMRMLTableNode') == []: # ***
       tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
     slicer.util.updateTableFromArray(tableNode,specArray,["Wavelength","Intensity"])
 
-    return specArray
+    return specArray # *** Instead of returning the array, should I just save it to the parameter node?
     
   def updateChart(self):
     #
