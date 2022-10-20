@@ -161,7 +161,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.updateParameterNodeFromGUI()
 
   def onModelFileSelectorChanged(self):
-    # Uparate the parameter node from the GUI
+    # Update the parameter node from the GUI
     self.updateParameterNodeFromGUI()
     # get the file from the modelFileSelector
     modelPath = self.ui.modelFileSelector.currentPath
@@ -207,13 +207,14 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
   # This should certainly link to the logic class directly instead of performing the logic here ***
   def onClearControlPointsButtonClicked(self):
     self.updateParameterNodeFromGUI()
-    # Check to see if the lists exist, and if not create them
-    self.logic.setupLists()
-    # *** this should be done from parameter node
-    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
-    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
-    pointListGreen_World.RemoveAllMarkups()
-    pointListRed_World.RemoveAllMarkups()
+    self.logic.clearControlPoints()
+    # # Check to see if the lists exist, and if not create them
+    # self.logic.setupLists()
+    # # *** this should be done from parameter node
+    # pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    # pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
+    # pointListGreen_World.RemoveAllMarkups()
+    # pointListRed_World.RemoveAllMarkups()
 
   def onAddControlPointButtonClicked(self):
     self.updateParameterNodeFromGUI()
@@ -406,6 +407,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   # ROLES
   POINTLISTGREEN_WORLD = 'pointListGreen_World'
   POINTLISTRED_WORLD = 'pointListRed_World'
+  POINTLISTEMT = 'pointListEMT'
   CONNECTOR = 'Connector'
 
   DISTANCE_THRESHOLD = 2 # in mm
@@ -503,6 +505,18 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     tip_World = pos
     pointListGreen_World.AddControlPoint(tip_World)
     pointListGreen_World.SetNthControlPointLabel(pointListGreen_World.GetNumberOfControlPoints()-1, '')
+
+  def clearControlPoints(self):
+    """
+    Clear all control points from the point lists.
+    """
+    # Check to see if the lists exist, and if not create them
+    self.setupLists()
+    # *** this should be done from parameter node
+    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
+    pointListGreen_World.RemoveAllMarkups()
+    pointListRed_World.RemoveAllMarkups()
 
   def startPlotting(self):
     print("Start plotting")
@@ -624,37 +638,46 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       '''
       This function is used to create the point lists if they're not present.
       '''
-      # Check for the Green List
-      if slicer.mrmlScene.GetFirstNodeByName('pointListGreen_World') == None: # I want to check the parameter node directly # ***
-        pointListGreen_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
-        pointListGreen_World.SetName('pointListGreen_World')
-        pointListGreen_World.GetDisplayNode().SetSelectedColor(0,1,0) # Set colour to green
+      # get the parameter node
+      parameterNode = self.getParameterNode()
 
-      # Check for the Red List
-      if slicer.mrmlScene.GetFirstNodeByName('pointListRed_World') == None: # ***
-        pointListRed_World = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
-        pointListRed_World.SetName('pointListRed_World')
-        pointListRed_World.GetDisplayNode().SetSelectedColor(1,0,0) # Set colour to red
-      pointListRed_World = slicer.mrmlScene.GetFirstNodeByName('pointListRed_World') # ***
-      # Get the size of a control point
-      # controlPointSize = pointListRed_World.GetMarkupsDisplayNode().GetGlyphScale()
-      # Set the size of the control point
-      # pointListRed_World.GetMarkupsDisplayNode().SetGlyphScale(2)
-      # Set an absolute size for the control point
+      # Check to see if role pointListGreen_World is present
+      if parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD) == None:
+        # Create a point list for the green points in world coordinates
+        pointListGreen_World = slicer.vtkMRMLMarkupsFiducialNode()
+        pointListGreen_World.SetName("pointListGreen_World")
+        slicer.mrmlScene.AddNode(pointListGreen_World)
+        # Set the color of the points to green
+        pointListGreen_World.GetDisplayNode().SetSelectedColor(0,1,0)
+        # Set the role of the point list
+        parameterNode.SetNodeReferenceID(self.POINTLIST_GREEN_WORLD, pointListGreen_World.GetID())
 
-      # Check for the EMT list
-      if slicer.mrmlScene.GetFirstNodeByName('pointList_EMT') == None: # ***
-        pointList_EMT = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
-        pointList_EMT.SetName('pointList_EMT')
-        #add pointList_EMT to the EMT reference frame
-      pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT") # ***
-      # pointList_EMT.SetAndObserveTransformNodeID(slicer.mrmlScene.GetFirstNodeByName('ProbeTiptoProbe').GetID())
+      # Check to see if role pointListRed_World is present
+      if parameterNode.GetNodeReference(self.POINTLIST_RED_WORLD) == None:
+        # Create a point list for the red points in world coordinates
+        pointListRed_World = slicer.vtkMRMLMarkupsFiducialNode()
+        pointListRed_World.SetName("pointListRed_World")
+        slicer.mrmlScene.AddNode(pointListRed_World)
+        # Set the color of the points to red
+        pointListRed_World.GetDisplayNode().SetSelectedColor(1,0,0)
+        # Set the role of the point list
+        parameterNode.SetNodeReferenceID(self.POINTLIST_RED_WORLD, pointListRed_World.GetID())
 
-      # if pointList_EMT is empty, add a point at the origin
+      # Check to see if role pointList_EMT is present
+      if parameterNode.GetNodeReference(self.POINTLIST_EMT) == None:
+        # Create a point list for the endoscope tip in reference coordinates
+        pointList_EMT = slicer.vtkMRMLMarkupsFiducialNode()
+        pointList_EMT.SetName("pointList_EMT")
+        slicer.mrmlScene.AddNode(pointList_EMT)
+        # Set the role of the point list
+        parameterNode.SetNodeReferenceID(self.POINTLIST_EMT, pointList_EMT.GetID())
+
+      # If the point list for EMT is empty, add a point to the origin
+      pointList_EMT = parameterNode.GetNodeReference(self.POINTLIST_EMT)
       if pointList_EMT.GetNumberOfControlPoints() == 0:
         pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
         pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
-      pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
+
   
   def updateOutputTable(self):
     # Get the table created by the selector
