@@ -232,17 +232,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.updateParameterNodeFromGUI()
     # Check to see if the lists exist, and if not create them
     self.logic.setupLists()
-
-    # pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World") # Change to index
-    # pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
-    # parameterNode = self.logic.getParameterNode()
-
-    # lastPointClass = parameterNode.GetParameter('LastPointAdded')
-    # if lastPointClass == self.logic.CLASS_LABEL_0:
-    #   # remove the Nth control point
-    #   pointListGreen_World.RemoveNthControlPoint(pointListGreen_World.GetNumberOfControlPoints()-1)
-    # elif lastPointClass == self.logic.CLASS_LABEL_1:
-    #   pointListRed_World.RemoveNthControlPoint(pointListRed_World.GetNumberOfControlPoints()-1)
+    print("This button is not currently implemented")
     pass
 
   def onClearControlPointsButtonClicked(self):
@@ -300,19 +290,16 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       if firstVolumeNode:
         self._parameterNode.SetNodeReferenceID(self.logic.INPUT_VOLUME, firstVolumeNode.GetID())
 
-    # If no table selection exists, create one and select it
-    if not self._parameterNode.GetNodeReference(self.logic.OUTPUT_TABLE):
-      # if a table node is not selected, create a new one
-      firstTableNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLTableNode") # ***
-      if not firstTableNode:
+    # If the output table does not exist, create one and select it
+    if self._parameterNode.GetNodeReference(self.logic.OUTPUT_TABLE) is None:
+      # a table node is not selected, create a new one
         firstTableNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLTableNode")
         firstTableNode.SetName('Table')
         slicer.mrmlScene.AddNode(firstTableNode)
-      if firstTableNode:
         self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, firstTableNode.GetID())
 
     # If no model path is selected, select the default one
-    if not self._parameterNode.GetNodeReference(self.logic.MODEL_PATH):
+    if self._parameterNode.GetNodeReference(self.logic.MODEL_PATH) is None:
       defaultModelPath = 'C:/OpticalSpectroscopy_TissueClassification/TrainedModels/KNN_PorkVsBeefTest.joblib' # Hardcoded path
       self._parameterNode.SetParameter(self.logic.MODEL_PATH, defaultModelPath)
 
@@ -334,7 +321,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.ui.outputTableSelector.setCurrentNode(self._parameterNode.GetNodeReference(self.logic.OUTPUT_TABLE))
 
     # Update buttons state
-    nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') 
+    nodeList = slicer.util.getNodesByClass('vtkMRMLIGTLConnectorNode') # ***
     if nodeList == []:
       pass
     else:
@@ -537,9 +524,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     """
     Place a fiducial at the tool tip.
     """
-    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World") # ***
-    pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT") # ***
-
+    parameterNode = self.getParameterNode()
+    pointListGreen_World = parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD)
+    pointList_EMT = parameterNode.GetNodeReference(self.POINTLIST_EMT)
     # The the tip of the probe in world coordinates
     pos = [0,0,0]
     pointList_EMT.GetNthControlPointPositionWorld(0,pos)
@@ -557,8 +544,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # *** this should be done from parameter node
     pointListGreen_World = parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD)
     pointListRed_World = parameterNode.GetNodeReference(self.POINTLIST_RED_WORLD)
-    # pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
-    # pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
     pointListGreen_World.RemoveAllMarkups()
     pointListRed_World.RemoveAllMarkups()
 
@@ -620,17 +605,17 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
 
   def addControlPointToToolTip(self):
     # Get the required nodes
-    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World") # ***
-    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World") # ***
-    pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT") # ***
+    parameterNode = self.getParameterNode()
+    pointListGreen_World = parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD)
+    pointListRed_World = parameterNode.GetNodeReference(self.POINTLIST_RED_WORLD)
+    pointList_EMT = parameterNode.GetNodeReference(self.POINTLIST_EMT)
 
     # The the tip of the probe in world coordinates
     pos = [0,0,0]
     pointList_EMT.GetNthControlPointPositionWorld(0,pos)
     tip_World = pos
-
+    # print("Tip World: ", tip_World)
     # Add control point at tip of probe based on classification
-    parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     # Convert image to volume 
     specArray = slicer.util.arrayFromVolume(spectrumImageNode)
@@ -667,8 +652,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
 
     # If the enable scanning button is checked
     if parameterNode.GetParameter(self.SCANNING_STATE) == "True":
-      pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World") # ***
-      pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World") # ***
+      pointListGreen_World = parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD)
+      pointListRed_World = parameterNode.GetNodeReference(self.POINTLIST_RED_WORLD)
       # if the red and green point lists are both empty
       if pointListRed_World.GetNumberOfControlPoints() == 0 and pointListGreen_World.GetNumberOfControlPoints() == 0:
         self.addControlPointToToolTip()
@@ -677,24 +662,17 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       else:
         # The the tip of the probe in world coordinates
         pos = [0,0,0]
-        pointList_EMT = slicer.mrmlScene.GetFirstNodeByName("pointList_EMT") # ***
+        pointList_EMT = parameterNode.GetNodeReference(self.POINTLIST_EMT)
         pointList_EMT.GetNthControlPointPositionWorld(0,pos)
-        # # Transform the point from world to referenece coordinates
-        # TrackerToReferenceNode = slicer.mrmlScene.GetFirstNodeByName("ReferenceToTracker (-)")
-        # pos = TrackerToReferenceNode.GetMatrixTransformToParent().MultiplyPoint(pos)
         tip_World = pos
             
         # Get the last control point of green in world coordinates
         pos = [0,0,0]
         pointListGreen_World.GetNthControlPointPositionWorld(pointListGreen_World.GetNumberOfControlPoints()-1,pos)
-        # # Transform the point from world to referenece coordinates
-        # pos = TrackerToReferenceNode.GetMatrixTransformToParent().MultiplyPoint(pos)
         lastPointGreen_World = pos
         # Get the last control point of red in world coordinates
         pos = [0,0,0]
         pointListRed_World.GetNthControlPointPositionWorld(pointListRed_World.GetNumberOfControlPoints()-1,pos)
-        # # Transform the point from world to referenece coordinates
-        # pos = TrackerToReferenceNode.GetMatrixTransformToParent().MultiplyPoint(pos)
         lastPointRed_World = pos
 
         # Get the distance between the tip and the last control point
@@ -764,16 +742,20 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       logging.error("Spectrum image is expected to have exactly 2 rows, got {0}".format(numberOfRows))
       return
 
-    # Get the image from the volume selector
-    specIm = spectrumImageNode
-    # Convert it to a displayable format
-    specArray = slicer.util.arrayFromVolume(specIm)
+    # Convert image to a displayable format
+    specArray = slicer.util.arrayFromVolume(spectrumImageNode)
     specArray = np.squeeze(specArray)
     specArray = np.transpose(specArray)
 
     # Save results to a new table node
-    if slicer.util.getNodesByClass('vtkMRMLTableNode') == []: # ***
-      tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
+    if tableNode is None:
+      tableNode = slicer.vtkMRMLTableNode()
+      slicer.mrmlScene.AddNode(tableNode)
+      # Name the table
+      tableNode.SetName("OutputTable")
+      parameterNode.SetNodeReferenceID(self.OUTPUT_TABLE, tableNode.GetID())
+    # if slicer.util.getNodesByClass('vtkMRMLTableNode') == []: # ***
+    #   tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
     slicer.util.updateTableFromArray(tableNode,specArray,["Wavelength","Intensity"])
 
     return specArray # *** Instead of returning the array, should I just save it to the parameter node?
