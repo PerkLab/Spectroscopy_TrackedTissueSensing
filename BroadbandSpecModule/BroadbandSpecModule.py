@@ -447,6 +447,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   POINTLIST_EMT = 'pointList_EMT'
   CONNECTOR = 'Connector'
   SAMPLE_SEQUENCE = 'SampleSequence'
+  OUTPUT_SERIES = "OutputSeries"
+  OUTPUT_CHART = "OutputChart"
 
   # Constants
   DISTANCE_THRESHOLD = 2 # in mm
@@ -551,9 +553,12 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     """
     # Check to see if the lists exist, and if not create them
     self.setupLists()
+    parameterNode = self.getParameterNode()
     # *** this should be done from parameter node
-    pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
-    pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
+    pointListGreen_World = parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD)
+    pointListRed_World = parameterNode.GetNodeReference(self.POINTLIST_RED_WORLD)
+    # pointListGreen_World = slicer.mrmlScene.GetFirstNodeByName("pointListGreen_World")
+    # pointListRed_World = slicer.mrmlScene.GetFirstNodeByName("pointListRed_World")
     pointListGreen_World.RemoveAllMarkups()
     pointListRed_World.RemoveAllMarkups()
 
@@ -774,37 +779,42 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     return specArray # *** Instead of returning the array, should I just save it to the parameter node?
     
   def updateChart(self):
-    #
-    # Load in and classify the spectra using the model. This should be passed in as a parameter
-    #
+    ''' Update the display chart using the the given spectra and classification '''
     # specPred, specLabel = self.classifySpectra(specArray[743:-1,:]) 
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     tableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
     spectrumLabel = parameterNode.GetParameter(self.CLASSIFICATION)
 
-    # Create plot
-    if slicer.util.getNodesByClass('vtkMRMLPlotSeriesNode') == []:
-      plotSeriesNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotSeriesNode", spectrumImageNode.GetName() + " plot")
-    plotSeriesNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotSeriesNode")  # ***
-    plotSeriesNode.SetAndObserveTableNodeID(tableNode.GetID())
-    plotSeriesNode.SetXColumnName("Wavelength")
-    plotSeriesNode.SetYColumnName("Intensity")
-    plotSeriesNode.SetPlotType(plotSeriesNode.PlotTypeScatter)
-    plotSeriesNode.SetColor(0, 0.6, 1.0)
+    # Create PlotSeriesNode for the spectra
+    plotSeriesNode = parameterNode.GetNodeReference(self.OUTPUT_SERIES)
+    # If the plotSeriesNode does not exists then create it, set the role and set default properties
+    if plotSeriesNode == None:
+      plotSeriesNode = slicer.vtkMRMLPlotSeriesNode()
+      slicer.mrmlScene.AddNode(plotSeriesNode)
+      #plotSeriesNode.SetName(spectrumImageNode.GetName() + " plot")
+      plotSeriesNode.SetName("Measured Spectrum")
+      parameterNode.SetNodeReferenceID(self.OUTPUT_SERIES, plotSeriesNode.GetID())
+      plotSeriesNode.SetAndObserveTableNodeID(tableNode.GetID())
+      plotSeriesNode.SetXColumnName("Wavelength")
+      plotSeriesNode.SetYColumnName("Intensity")
+      plotSeriesNode.SetPlotType(plotSeriesNode.PlotTypeScatter)
+      plotSeriesNode.SetColor(0, 0.6, 1.0)
 
+    #Create PlotChartNode for the spectra
+    plotChartNode = parameterNode.GetNodeReference(self.OUTPUT_CHART)
     # Create chart and add plot
-    if slicer.util.getNodesByClass('vtkMRMLPlotChartNode') == []:
-      plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
-    plotChartNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotChartNode")  # ***
-    plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID())
-    plotChartNode.YAxisRangeAutoOn() # The axes can be set or automatic by toggling between on and off
-    # plotChartNode.SetYAxisRange(0, 2)
-    # plotChartNode.SetTitle('Spectrum')
-    plotChartNode.SetTitle(str(spectrumLabel))
-    plotChartNode.SetXAxisTitle('Wavelength [nm]')
-    plotChartNode.SetYAxisTitle('Intensity')
+    if plotChartNode == None:
+      plotChartNode = slicer.vtkMRMLPlotChartNode()
+      slicer.mrmlScene.AddNode(plotChartNode)
+      parameterNode.SetNodeReferenceID(self.OUTPUT_CHART, plotChartNode.GetID())
 
+      plotChartNode.SetAndObservePlotSeriesNodeID(plotSeriesNode.GetID())
+      plotChartNode.YAxisRangeAutoOn() # The axes can be set or automatic by toggling between on and off
+      # plotChartNode.SetYAxisRange(0, 2)
+      plotChartNode.SetXAxisTitle('Wavelength [nm]')
+      plotChartNode.SetYAxisTitle('Intensity')  
+    plotChartNode.SetTitle(str(spectrumLabel)+" detected")
     # Show plot in layout
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
 

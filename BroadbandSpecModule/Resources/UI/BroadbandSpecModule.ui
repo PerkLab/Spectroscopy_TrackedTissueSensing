@@ -120,6 +120,16 @@
         </property>
        </widget>
       </item>
+      <item row="5" column="1">
+       <widget class="QPushButton" name="enablePlottingButton">
+        <property name="text">
+         <string>Enable Plotting</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
@@ -130,16 +140,6 @@
      </property>
      <layout class="QFormLayout" name="formLayout_6">
       <item row="1" column="1">
-       <widget class="QPushButton" name="enablePlottingButton">
-        <property name="text">
-         <string>Enable Plotting</string>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
        <widget class="QPushButton" name="scanButton">
         <property name="text">
          <string>Start Scanning</string>
@@ -156,13 +156,6 @@
         </property>
        </widget>
       </item>
-      <item row="3" column="1">
-       <widget class="QPushButton" name="addControlPointButton">
-        <property name="text">
-         <string>Add Control Point at Tool Tip</string>
-        </property>
-       </widget>
-      </item>
       <item row="4" column="1">
        <widget class="QPushButton" name="clearLastPointButton">
         <property name="enabled">
@@ -170,6 +163,13 @@
         </property>
         <property name="text">
          <string>Clear Last Point</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QPushButton" name="addControlPointButton">
+        <property name="text">
+         <string>Add Control Point at Tool Tip</string>
         </property>
        </widget>
       </item>
