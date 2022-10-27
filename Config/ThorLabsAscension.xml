@@ -6,9 +6,16 @@
       Description="Broadcasting acquired spectrum through OpenIGTLink. First image row contains wavelength value, second image row contains intensities." />
     <Device
       Id="VideoDevice" 
-      Type="ThorLabsVideo" >
+      Type="ThorLabsVideo"
+
+	  IntegrationTimeSec = "0.05"
+	  > <!-- IntegrationTimeSec default is 0.05 -->
       <DataSources>
-        <DataSource Type="Video" Id="Video" />
+        <DataSource 
+		   Type="Video" 
+		   Id="Video" 
+		   
+		/> <!-- ClipRectangleSize = [0 0 0] -->
       </DataSources>      
       <OutputChannels>
         <OutputChannel Id="VideoStream" VideoDataSourceId="Video" />

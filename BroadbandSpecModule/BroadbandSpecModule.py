@@ -5,6 +5,7 @@ from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 import sklearn
 import numpy as np
+import time
 try: 
   from joblib import load
 except:
@@ -284,6 +285,9 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     # so that when the scene is saved and reloaded, these settings are restored.
     self.setParameterNode(self.logic.getParameterNode())
 
+    # Ensure the required lists are created and reference in the parameter node
+    self.logic.setupLists()
+
     # Select default input nodes if nothing is selected yet to save a few clicks for the user
     if not self._parameterNode.GetNodeReference(self.logic.INPUT_VOLUME):
       firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode") # ***
@@ -434,6 +438,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   POINTLIST_EMT = 'pointList_EMT'
   CONNECTOR = 'Connector'
   SAMPLE_SEQUENCE = 'SampleSequence'
+  SAMPLE_SEQ_BROWSER = 'SampleSequenceBrowser'
   OUTPUT_SERIES = "OutputSeries"
   OUTPUT_CHART = "OutputChart"
 
@@ -579,29 +584,117 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   def collectSample(self):
     # In this module I will collect X spectra over Y seconds using a sequence object
     # I will then save them to a csv with the label given by the class selector
+
+    # Load in the parameters
     parameterNode = self.getParameterNode()
-
-    # If a sequence node does not exist in the parameter node, create one *** This should be in initialize parameter node
-    sampleSeqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
-    if sampleSeqNode == None:
-      # create a sequence node
-      sampleSeqNode = slicer.vtkMRMLSequenceNode()
-      slicer.mrmlScene.AddNode(sampleSeqNode)
-      sampleSeqNode.SetName("SampleSequence")
-      parameterNode.SetNodeReferenceID(self.SAMPLE_SEQUENCE, sampleSeqNode.GetID())
-
-    # Get the sequence node
-    sampleSeqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
-    # Get the class label
     dataLabel = parameterNode.GetParameter(self.DATA_CLASS)
-    # Get the sampling duration
     sampleDuration = parameterNode.GetParameter(self.SAMPLE_DURATION)
-    # Get the sampling frequency
     sampleFrequency = parameterNode.GetParameter(self.SAMPLE_PER_SECOND)
-    # Record 1 second of data into the sample sequence node
-    self.recordSequence(sampleSeqNode, dataLabel, sampleDuration, sampleFrequency)
+    image_imageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    # sampleSeqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
+    browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
+
+    # Create the sequence node and the sequenceBrowser node *** This should be in initialize parameter node
+    # if sampleSeqNode == None:
+    #   # create a sequence node
+    #   sampleSeqNode = slicer.vtkMRMLSequenceNode()
+    #   slicer.mrmlScene.AddNode(sampleSeqNode)
+    #   sampleSeqNode.SetName("SampleSequence")
+    #   parameterNode.SetNodeReferenceID(self.SAMPLE_SEQUENCE, sampleSeqNode.GetID())
+
+    if browserNode == None:
+      browserNode = slicer.vtkMRMLSequenceBrowserNode()
+      slicer.mrmlScene.AddNode(browserNode)
+      browserNode.SetName("SampleSequenceBrowser")
+      parameterNode.SetNodeReferenceID(self.SAMPLE_SEQ_BROWSER, browserNode.GetID())
+
+    '''
+    There is a brwoser and a sequence
+    SetPlayback
+    SetRecordingActive  
+    The goal is to create a a sequencec of spectra using the sequence browser over 1 section and then save it to a csv
+    self = slicer.mymodLog
+    parameterNode = self.getParameterNode()
+    seqBrowserNode.RemoveAllProxyNodes()
+
+    '''
+
+    # print("Image node: " + image_imageNode.GetName())
+    # print("Sample sequence node: " + sampleSeqNode.GetName())
+    # print("Sequence browser node: " + browserNode.GetName())
+
+    # Instantiate sequenceLogic
+    sequenceLogic = slicer.modules.sequences.logic()
+    # Add sequence
+    sequenceNode = sequenceLogic.AddSynchronizedNode(None, image_imageNode, browserNode)
+    # save seq ID to parameter node
+    if parameterNode.GetNodeReferenceID(self.SAMPLE_SEQUENCE) is None:
+      parameterNode.SetNodeReferenceID(self.SAMPLE_SEQUENCE, sequenceNode.GetID())
+
+    browserNode.SetRecording(sequenceNode, True)
+    browserNode.SetPlayback(sequenceNode, True)
+    browserNode.SetRecordingActive(True)
+    timer = qt.QTimer()
+    timer.singleShot(1000, lambda: browserNode.SetRecordingActive(False))
+    # Everything here appears to work, but the sequence is not being saved to the sequence node
+
+    print("Sequence node: " + sequenceNode.GetName())
+    #print ID
+    print("Sequence node ID: " + sequenceNode.GetID())
+    # get seq by id
+    seqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
+    print("Sequence length: " + str(seqNode.GetNumberOfDataNodes()))
+
+    # Get node by ID
+    # seq = slicer.mrmlScene.GetNodeByID(sequenceNode.GetID())
+    # seq = slicer.mrmlScene.GetNodeByID("vtkMRMLSequenceNode2")
+    # delete the sequence from the scene
+    # slicer.mrmlScene.RemoveNode(sequenceNode)
+
+
+
+    '''
+    Tamas: This script was to record lots of sequences
+    sequenceLogic = slicer.modules.sequences.logic()
+    sequenceNode = sequenceLogic.AddSynchronizedNode(None, image_imageNode, seqBrowserNode) # Do not create a sequence node.
+    browserNode.SetRecording(sequenceNode, True)
+    browserNode.SetPlayback(sequenceNode, True)
+
+    # Start recording
+    browserNode.SetRecordingActive(True)
+
+    # To turn it off after a given time, use a Qtimer
+    timer = qt.QTimer()
+    timer.singleShot(1000, lambda: browserNode.SetRecordingActive(False))
+
+    # Google python string formats
+
+
+    '''
+    # folder = 'C:/OpticalSpectroscopy_TissueClassification/broadbandTestData/' + dataLabel + '/'
+
+    # for idx in range(sampleSeqNode.GetNumberOfDataNodes()): # fill up the whole array first then save once.
+    #     volumeNode = sampleSeqNode.GetNthDataNode(idx)
+    #     specArray = slicer.util.arrayFromVolume(volumeNode)
+    #     specArray = np.squeeze(specArray)
+    #     specArray = np.transpose(specArray)
+    #     if idx <= 9:# There is a 
+    #         num = '0'+str(idx)
+    #     else:
+    #         num = str(idx)
+
+    #     np.savetxt(folder + dataLabel + num + '.csv', specArray, delimiter=',') # Switch to Os.path.join
+
+
+
+    # #Clear the sequence node
+    # sampleSeqNode.RemoveAllDataNodes()
+
 
     # clear the sequence
+
+
+
 
   def addControlPointToToolTip(self):
     # Get the required nodes
@@ -636,6 +729,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
 
   def onSpectrumImageNodeModified(self, observer, eventid):
     self.setupLists()
+    # print("Spectrum Image Node Modified")
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     outputTableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
@@ -728,6 +822,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       if pointList_EMT.GetNumberOfControlPoints() == 0:
         pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
         pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
+      # move pointList_EMT to the ProbeTiptoProbe transform
+      pass
   
   def updateOutputTable(self):
     # Get the table created by the selector
