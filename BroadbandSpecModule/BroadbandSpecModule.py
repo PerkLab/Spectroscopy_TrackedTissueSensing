@@ -5,7 +5,6 @@ from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 import sklearn
 import numpy as np
-import time
 try: 
   from joblib import load
 except:
