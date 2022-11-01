@@ -156,7 +156,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
   def onCollectSampleButtonClicked(self):
     self.updateParameterNodeFromGUI()
-    self.logic.collectSample()
+    self.logic.recordSample()
 
   def onConnectButtonClicked(self):
     '''
@@ -303,7 +303,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     # If no model path is selected, select the default one
     if self._parameterNode.GetNodeReference(self.logic.MODEL_PATH) is None:
-      defaultModelPath = 'C:/OpticalSpectroscopy_TissueClassification/TrainedModels/KNN_PorkVsBeefTest.joblib' # Hardcoded path
+      defaultModelPath = 'C:/Spectroscopy_TrackedTissueSensing/TrainedModels/KNN_PorkVsBeefTest.joblib' # Hardcoded path
       self._parameterNode.SetParameter(self.logic.MODEL_PATH, defaultModelPath)
 
   def updateGUIFromParameterNode(self, caller=None, event=None):
@@ -452,7 +452,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     self.observerTags = [] # This is reset when the module is reloaded. But not all observers are removed.
     # ###
     slicer.mymodLog = self
-    # path = "C:\OpticalSpectroscopy_TissueClassification\Models/"
+    # path = "C:\Spectroscopy_TrackedTissueSensing\Models/"
     # filename = "KNN_TestModel.joblib" 
     # filename = "KNN_BlueVsWhite.joblib" 
     # filename = "KNN_CardboardVsTeaBox.joblib" 
@@ -467,7 +467,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       parameterNode.SetParameter(self.CLASSIFICATION, '')
     # if the self.model path is not set, grab it from the ctkPathLineEdit widget
     if parameterNode.GetParameter(self.MODEL_PATH) == '':
-      parameterNode.SetParameter(self.MODEL_PATH, 'C:/OpticalSpectroscopy_TissueClassification/TrainedModels/KNN_PorkVsBeefTest.joblib') # Hardcoded path
+      parameterNode.SetParameter(self.MODEL_PATH, 'C:/Spectroscopy_TrackedTissueSensing/TrainedModels/KNN_PorkVsBeefTest.joblib') # Hardcoded path
     # print("Model path1: " + parameterNode.GetParameter(self.MODEL_PATH))
     # print(self.model)
     if self.model == None:
@@ -580,7 +580,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     print('Stopping Scanning')
     pass
 
-  def collectSample(self):
+  def recordSample(self):
     # In this module I will collect X spectra over Y seconds using a sequence object
     # I will then save them to a csv with the label given by the class selector
 
@@ -590,16 +590,11 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     sampleDuration = parameterNode.GetParameter(self.SAMPLE_DURATION)
     sampleFrequency = parameterNode.GetParameter(self.SAMPLE_PER_SECOND)
     image_imageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
-    # sampleSeqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
     browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
 
-    # Create the sequence node and the sequenceBrowser node *** This should be in initialize parameter node
-    # if sampleSeqNode == None:
-    #   # create a sequence node
-    #   sampleSeqNode = slicer.vtkMRMLSequenceNode()
-    #   slicer.mrmlScene.AddNode(sampleSeqNode)
-    #   sampleSeqNode.SetName("SampleSequence")
-    #   parameterNode.SetNodeReferenceID(self.SAMPLE_SEQUENCE, sampleSeqNode.GetID())
+    print("Collecting sample")
+    # Print sampleDuration
+    print("Sample duration: " + sampleDuration)
 
     if browserNode == None:
       browserNode = slicer.vtkMRMLSequenceBrowserNode()
@@ -615,42 +610,38 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     self = slicer.mymodLog
     parameterNode = self.getParameterNode()
     seqBrowserNode.RemoveAllProxyNodes()
+    image.EndModify(0) # when the second seq is created I think it modifys the first and then the second is ended. When things stop modifying call this. 
 
     '''
 
-    # print("Image node: " + image_imageNode.GetName())
-    # print("Sample sequence node: " + sampleSeqNode.GetName())
-    # print("Sequence browser node: " + browserNode.GetName())
-
     # Instantiate sequenceLogic
     sequenceLogic = slicer.modules.sequences.logic()
-    # Add sequence
-    sequenceNode = sequenceLogic.AddSynchronizedNode(None, image_imageNode, browserNode)
+    # Only call this once, check to see if the sequence already exists
     # save seq ID to parameter node
     if parameterNode.GetNodeReferenceID(self.SAMPLE_SEQUENCE) is None:
+      sequenceNode = sequenceLogic.AddSynchronizedNode(None, image_imageNode, browserNode) # Check doc on AddSynchronizedNode to see if there is another way.
       parameterNode.SetNodeReferenceID(self.SAMPLE_SEQUENCE, sequenceNode.GetID())
+    sequenceNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
+    # Print clearing sequence node
+    sequenceNode.RemoveAllDataNodes()
 
     browserNode.SetRecording(sequenceNode, True)
     browserNode.SetPlayback(sequenceNode, True)
     browserNode.SetRecordingActive(True)
     timer = qt.QTimer()
-    timer.singleShot(1000, lambda: browserNode.SetRecordingActive(False))
-    # Everything here appears to work, but the sequence is not being saved to the sequence node
+    # NOTE: singleShot will proceed with the next lines of code before the timer is done
 
-    print("Sequence node: " + sequenceNode.GetName())
-    #print ID
-    print("Sequence node ID: " + sequenceNode.GetID())
-    # get seq by id
+    timer.singleShot(float(sampleDuration)*1000+50, lambda: browserNode.SetRecordingActive(False)) # can create a new function here for print statements
+
+ 
     seqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
-    print("Sequence length: " + str(seqNode.GetNumberOfDataNodes()))
+
 
     # Get node by ID
     # seq = slicer.mrmlScene.GetNodeByID(sequenceNode.GetID())
     # seq = slicer.mrmlScene.GetNodeByID("vtkMRMLSequenceNode2")
     # delete the sequence from the scene
     # slicer.mrmlScene.RemoveNode(sequenceNode)
-
-
 
     '''
     Tamas: This script was to record lots of sequences
@@ -665,12 +656,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # To turn it off after a given time, use a Qtimer
     timer = qt.QTimer()
     timer.singleShot(1000, lambda: browserNode.SetRecordingActive(False))
-
     # Google python string formats
-
-
     '''
-    # folder = 'C:/OpticalSpectroscopy_TissueClassification/broadbandTestData/' + dataLabel + '/'
+    # folder = 'C:/Spectroscopy_TrackedTissueSensing/broadbandTestData/' + dataLabel + '/'
 
     # for idx in range(sampleSeqNode.GetNumberOfDataNodes()): # fill up the whole array first then save once.
     #     volumeNode = sampleSeqNode.GetNthDataNode(idx)
@@ -684,15 +672,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
 
     #     np.savetxt(folder + dataLabel + num + '.csv', specArray, delimiter=',') # Switch to Os.path.join
 
-
-
-    # #Clear the sequence node
-    # sampleSeqNode.RemoveAllDataNodes()
-
-
-    # clear the sequence
-
-
+  def saveSample(self):
+  
+    pass
 
 
   def addControlPointToToolTip(self):
@@ -899,7 +881,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # Get the max value in X_test to see if we will classify or not
     max_value = np.amax(X_test[:,1])
     # # Subtract the baseline from the data
-    # path = 'C:/OpticalSpectroscopy_TissueClassification/raw_data/'
+    # path = 'C:/Spectroscopy_TrackedTissueSensing/raw_data/'
     # file_name = 'white_baseline.csv'
     # baseline_pap = IO.loadSpectrum(path, file_name, 'Wavelength', start_index=774)
     # baseline = baseline_pap[:-1,:]
