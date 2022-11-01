@@ -16,6 +16,9 @@
      <property name="text">
       <string>Setup</string>
      </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
      <layout class="QFormLayout" name="formLayout_2">
       <item row="0" column="0">
        <widget class="QLabel" name="label_1">
@@ -120,17 +123,20 @@
         </property>
        </widget>
       </item>
-      <item row="5" column="1">
-       <widget class="QPushButton" name="enablePlottingButton">
-        <property name="text">
-         <string>Enable Plotting</string>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
      </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="enablePlottingButton">
+     <property name="text">
+      <string>Enable Plotting</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
     </widget>
    </item>
    <item>
@@ -148,10 +154,13 @@
       <item row="1" column="1">
        <widget class="QPushButton" name="scanButton">
         <property name="text">
-         <string>Start Scanning</string>
+         <string>Start continuous scan</string>
         </property>
         <property name="checkable">
          <bool>true</bool>
+        </property>
+        <property name="checked">
+         <bool>false</bool>
         </property>
        </widget>
       </item>
@@ -175,7 +184,7 @@
       <item row="0" column="1">
        <widget class="QPushButton" name="addControlPointButton">
         <property name="text">
-         <string>Add Control Point at Tool Tip</string>
+         <string>Point Scan</string>
         </property>
        </widget>
       </item>
@@ -203,26 +212,43 @@
        </widget>
       </item>
       <item row="1" column="0">
+       <widget class="QLabel" name="label_21">
+        <property name="text">
+         <string>Save Location</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="ctkPathLineEdit" name="saveLocationSelector">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="acceptDrops">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QComboBox" name="sampleDurationSelector"/>
+      </item>
+      <item row="2" column="0">
        <widget class="QLabel" name="label_20">
         <property name="text">
          <string>Sampling duration (seconds)</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QComboBox" name="sampleDurationSelector"/>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_21">
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_22">
         <property name="text">
-         <string>Spectra per second</string>
+         <string>Samples Per Second</string>
         </property>
        </widget>
       </item>
-      <item row="2" column="1">
-       <widget class="QComboBox" name="sampleRateSelector"/>
-      </item>
       <item row="3" column="1">
+       <widget class="QComboBox" name="samplePerSecondSelector"/>
+      </item>
+      <item row="4" column="1">
        <widget class="QPushButton" name="collectSampleButton">
         <property name="text">
          <string>Collect Sample</string>

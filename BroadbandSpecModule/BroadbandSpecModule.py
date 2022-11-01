@@ -1,3 +1,4 @@
+from array import array
 from calendar import SATURDAY
 import logging
 from __main__ import vtk, qt, ctk, slicer
@@ -5,6 +6,7 @@ from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 import sklearn
 import numpy as np
+import os
 try: 
   from joblib import load
 except:
@@ -116,20 +118,19 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     # *** When these change, simply update the parameter node
     self.ui.dataClassSelector.connect('currentIndexChanged(int)', self.onDataClassSelectorChanged)
+    self.ui.saveLocationSelector.connect('currentPathChanged(QString)', self.onSaveLocationSelectorChanged)
     # add the options cancer and normal to the data class selector
     self.ui.dataClassSelector.addItem("Cancer")
     self.ui.dataClassSelector.addItem("Normal")
     self.ui.sampleDurationSelector.connect('currentIndexChanged(int)', self.onSampleDurationSelectorChanged)
     # add the options 0.5, 1, 2 to the sample duration selector
-    self.ui.sampleDurationSelector.addItem(0.5)
     self.ui.sampleDurationSelector.addItem(1)
     self.ui.sampleDurationSelector.addItem(2)
 
-    self.ui.sampleRateSelector.connect('currentIndexChanged(int)', self.onSampleRateSelectorChanged)
+    self.ui.samplePerSecondSelector.connect('currentIndexChanged(int)', self.onSamplePerSecondSelectorChanged)
     # add option 1, 10,100 to the sample rate selector
-    self.ui.sampleRateSelector.addItem(1)
-    self.ui.sampleRateSelector.addItem(10)
-    self.ui.sampleRateSelector.addItem(100)
+    self.ui.samplePerSecondSelector.addItem(10)
+    self.ui.samplePerSecondSelector.addItem(100)
     self.ui.collectSampleButton.connect('clicked(bool)', self.onCollectSampleButtonClicked)
 
     # Make sure parameter node is initialized (needed for module reload)
@@ -148,10 +149,10 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     sampleDuration = self.ui.sampleDurationSelector.currentText
     parameterNode.SetParameter(self.logic.SAMPLE_DURATION, sampleDuration)
 
-  def onSampleRateSelectorChanged(self):
+  def onSamplePerSecondSelectorChanged(self):
     self.updateParameterNodeFromGUI()
     parameterNode = self.logic.getParameterNode()
-    sampleRate = self.ui.sampleRateSelector.currentText
+    sampleRate = self.ui.samplePerSecondSelector.currentText
     parameterNode.SetParameter(self.logic.SAMPLE_PER_SECOND, sampleRate)
 
   def onCollectSampleButtonClicked(self):
@@ -194,6 +195,15 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         connectorNode.Stop()
         print('Connector node stopped')
         self.ui.connectButton.text = 'Connect'
+
+  def onSaveLocationSelectorChanged(self):
+      self.updateParameterNodeFromGUI()
+      # get path from the selector
+      path = self.ui.saveLocationSelector.currentPath
+      # get parameter node
+      parameterNode = self.logic.getParameterNode()
+      # set the path in the parameter node
+      parameterNode.SetParameter(self.logic.SAVE_LOCATION, path)
 
   def onSpectrumImageChanged(self):
     self.updateParameterNodeFromGUI()
@@ -303,8 +313,11 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     # If no model path is selected, select the default one
     if self._parameterNode.GetNodeReference(self.logic.MODEL_PATH) is None:
-      defaultModelPath = 'C:/Spectroscopy_TrackedTissueSensing/TrainedModels/KNN_PorkVsBeefTest.joblib' # Hardcoded path
-      self._parameterNode.SetParameter(self.logic.MODEL_PATH, defaultModelPath)
+      self._parameterNode.SetParameter(self.logic.MODEL_PATH, self.logic.DEFAULT_MODEL_PATH)
+
+    # Add a default save location if none exists
+    if self._parameterNode.GetNodeReference(self.logic.SAVE_LOCATION) is None:
+      self._parameterNode.SetParameter(self.logic.SAVE_LOCATION, self.logic.DEFAULT_SAVE_LOCATION)
 
   def updateGUIFromParameterNode(self, caller=None, event=None):
     """
@@ -338,6 +351,11 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     if self.ui.modelFileSelector.currentPath == '':
       # set the current path to whatever is stored in the parameter node
       self.ui.modelFileSelector.currentPath = self._parameterNode.GetParameter(self.logic.MODEL_PATH)
+
+    # Update the save location to be the last selection
+    if self.ui.saveLocationSelector.currentPath == '':
+      # set the current path to whatever is stored in the parameter node
+      self.ui.saveLocationSelector.currentPath = self._parameterNode.GetParameter(self.logic.SAVE_LOCATION)
   
     # All the GUI updates are done
     self._updatingGUIFromParameterNode = False
@@ -420,16 +438,18 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   # NAMES
   INPUT_VOLUME = "InputVolume"
   OUTPUT_TABLE = "OutputTable"
-  CLASSIFICATION = "Classification"
   MODEL_PATH = "ModelPath"
+  CLASSIFICATION = "Classification"
   CLASS_LABEL_0 = "ClassLabel0"
   CLASS_LABEL_1 = "ClassLabel1"
   CLASS_LABEL_NONE = "WeakSignal"
   SCANNING_STATE = 'Scanning State'
   PLOTTING_STATE = 'Plotting State'
-  SAMPLE_DURATION = "SampleDuration"
-  SAMPLE_PER_SECOND = "SampleRate"
-  DATA_CLASS = "DataClass"
+  CLICK_COUNT = 'Click Count'
+  SAMPLE_DURATION = "Sample Duration"
+  SAMPLE_PER_SECOND = "Sample Rate"
+  DATA_CLASS = "Data Class"
+  SAVE_LOCATION = 'Save Location'
 
   # ROLES
   POINTLIST_GREEN_WORLD = 'pointList_Green_World'
@@ -443,6 +463,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
 
   # Constants
   DISTANCE_THRESHOLD = 2 # in mm
+  DEFAULT_SAVE_LOCATION = os.path.join('C:\Spectroscopy_TrackedTissueSensing\data', 'Nov2022_skinTestData')
+  DEFAULT_MODEL_PATH = os.path.join('C:\Spectroscopy_TrackedTissueSensing\TrainedModels', 'KNN_WhiteVsBlue2.joblib')
 
   def __init__(self):
     """
@@ -611,9 +633,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     parameterNode = self.getParameterNode()
     seqBrowserNode.RemoveAllProxyNodes()
     image.EndModify(0) # when the second seq is created I think it modifys the first and then the second is ended. When things stop modifying call this. 
-
     '''
-
     # Instantiate sequenceLogic
     sequenceLogic = slicer.modules.sequences.logic()
     # Only call this once, check to see if the sequence already exists
@@ -625,56 +645,56 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # Print clearing sequence node
     sequenceNode.RemoveAllDataNodes()
 
+
     browserNode.SetRecording(sequenceNode, True)
     browserNode.SetPlayback(sequenceNode, True)
+    # set the fps
+    browserNode.SetPlaybackRateFps(float(sampleFrequency))
     browserNode.SetRecordingActive(True)
     timer = qt.QTimer()
     # NOTE: singleShot will proceed with the next lines of code before the timer is done
 
-    timer.singleShot(float(sampleDuration)*1000+50, lambda: browserNode.SetRecordingActive(False)) # can create a new function here for print statements
+    # timer.singleShot(float(sampleDuration)*1000+50, lambda: browserNode.SetRecordingActive(False)) # can create a new function here for print statements
+    timer.singleShot(float(sampleDuration)*1000+50, lambda: self.saveSample())
 
- 
-    seqNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
-
-
-    # Get node by ID
-    # seq = slicer.mrmlScene.GetNodeByID(sequenceNode.GetID())
-    # seq = slicer.mrmlScene.GetNodeByID("vtkMRMLSequenceNode2")
-    # delete the sequence from the scene
-    # slicer.mrmlScene.RemoveNode(sequenceNode)
-
-    '''
-    Tamas: This script was to record lots of sequences
-    sequenceLogic = slicer.modules.sequences.logic()
-    sequenceNode = sequenceLogic.AddSynchronizedNode(None, image_imageNode, seqBrowserNode) # Do not create a sequence node.
-    browserNode.SetRecording(sequenceNode, True)
-    browserNode.SetPlayback(sequenceNode, True)
-
-    # Start recording
-    browserNode.SetRecordingActive(True)
-
-    # To turn it off after a given time, use a Qtimer
-    timer = qt.QTimer()
-    timer.singleShot(1000, lambda: browserNode.SetRecordingActive(False))
-    # Google python string formats
-    '''
-    # folder = 'C:/Spectroscopy_TrackedTissueSensing/broadbandTestData/' + dataLabel + '/'
-
-    # for idx in range(sampleSeqNode.GetNumberOfDataNodes()): # fill up the whole array first then save once.
-    #     volumeNode = sampleSeqNode.GetNthDataNode(idx)
-    #     specArray = slicer.util.arrayFromVolume(volumeNode)
-    #     specArray = np.squeeze(specArray)
-    #     specArray = np.transpose(specArray)
-    #     if idx <= 9:# There is a 
-    #         num = '0'+str(idx)
-    #     else:
-    #         num = str(idx)
-
-    #     np.savetxt(folder + dataLabel + num + '.csv', specArray, delimiter=',') # Switch to Os.path.join
 
   def saveSample(self):
-  
-    pass
+    # get parameters
+    parameterNode = self.getParameterNode()
+    dataLabel = parameterNode.GetParameter(self.DATA_CLASS)
+    sampleDuration = parameterNode.GetParameter(self.SAMPLE_DURATION)
+    # Stop the timer
+    browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
+    browserNode.SetRecordingActive(False)
+    # Get the sequence node
+    sequenceNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
+    # Save the sequence to a csv
+    savePath = parameterNode.GetParameter(self.SAVE_LOCATION)
+    savePath = os.path.join(savePath, dataLabel)
+    # Loop through the sequence
+    sequenceLength = sequenceNode.GetNumberOfDataNodes()
+    # Format the empty array
+    # Get the length of a spectrum
+    spectrumArray = slicer.util.arrayFromVolume(sequenceNode.GetNthDataNode(0))
+    SpectrumLength = spectrumArray.shape[2]
+    # Create the 2D array
+    spectrumArray2D = np.zeros((sequenceLength + 1, SpectrumLength + 1))
+    # Fill the 2D array
+    # create a time vector using the sampleDuration
+    timeVector = np.linspace(0, float(sampleDuration), sequenceLength)
+    # concatenate the time vector to the spectrum array
+    spectrumArray2D[1:,0] = timeVector
+    # print shape of the array
+    print(spectrumArray2D.shape)
+    for i in range(sequenceLength):
+      # Get a spectrum as an array
+      spectrumArray = np.squeeze(slicer.util.arrayFromVolume(sequenceNode.GetNthDataNode(i)))
+      spectrumArray2D[i+1,1:] = spectrumArray[1,:]
+    # Save the array to a csv
+    clickCount = parameterNode.GetParameter(self.CLICK_COUNT)
+    np.savetxt(savePath + '.csv', spectrumArray2D[1:,:], delimiter=",")
+    # np.savetxt(savePath + clickCount + '.csv', spectrumArray2D[1:,:], delimiter=",")
+
 
 
   def addControlPointToToolTip(self):
