@@ -104,56 +104,63 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
     # (in the selected parameter node).
+
+    # Setup
     self.ui.connectButton.connect('clicked(bool)', self.onConnectButtonClicked)
     self.ui.spectrumImageSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onSpectrumImageChanged)
     self.ui.outputTableSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onOutputTableChanged)
     self.ui.modelFileSelector.connect('currentPathChanged(QString)', self.onModelFileSelectorChanged)
     self.ui.placeFiducialButton.connect('clicked(bool)', self.onPlaceFiducialButtonClicked)
-
     self.ui.enablePlottingButton.connect('clicked(bool)', self.setEnablePlotting)
+    # Inference
     self.ui.scanButton.connect('clicked(bool)', self.onScanButtonClicked)
     self.ui.addControlPointButton.connect('clicked(bool)', self.onAddControlPointButtonClicked)
     self.ui.clearControlPointsButton.connect('clicked(bool)', self.onClearControlPointsButtonClicked)
     self.ui.clearLastPointButton.connect('clicked(bool)', self.onClearLastPointButtonClicked)
-
-    # *** When these change, simply update the parameter node
+    # Data Collection
     self.ui.dataClassSelector.connect('currentIndexChanged(int)', self.onDataClassSelectorChanged)
     self.ui.saveLocationSelector.connect('currentPathChanged(QString)', self.onSaveLocationSelectorChanged)
     # add the options cancer and normal to the data class selector
     self.ui.dataClassSelector.addItem("Cancer")
     self.ui.dataClassSelector.addItem("Normal")
-    self.ui.sampleDurationSelector.connect('currentIndexChanged(int)', self.onSampleDurationSelectorChanged)
-    # add the options 0.5, 1, 2 to the sample duration selector
-    self.ui.sampleDurationSelector.addItem(1)
-    self.ui.sampleDurationSelector.addItem(2)
-
-    self.ui.samplePerSecondSelector.connect('currentIndexChanged(int)', self.onSamplePerSecondSelectorChanged)
-    # add option 1, 10,100 to the sample rate selector
-    self.ui.samplePerSecondSelector.addItem(10)
-    self.ui.samplePerSecondSelector.addItem(100)
+    self.ui.samplingDurationSlider.connect('valueChanged(double)', self.onSamplingDurationChanged)
+    self.ui.samplingRateSlider.connect('valueChanged(double)', self.onSamplingRateChanged)
     self.ui.collectSampleButton.connect('clicked(bool)', self.onCollectSampleButtonClicked)
-
+    self.ui.continuousCollectionButton.connect('clicked(bool)', self.onContinuousCollectionButtonClicked)
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
 
   # My functions
+  def onContinuousCollectionButtonClicked(self):
+    # if the button is checked, start collecting data
+    if self.ui.continuousCollectionButton.isChecked():
+      self.ui.continuousCollectionButton.setText("Stop Collection")
+      self.logic.startDataCollection()
+    # if the button is not checked, stop collecting data
+    else:
+      self.ui.continuousCollectionButton.setText("Start Continuous Collection")
+      self.logic.stopDataCollection()
+
   def onDataClassSelectorChanged(self):
     self.updateParameterNodeFromGUI()
     parameterNode = self.logic.getParameterNode()
     dataClass = self.ui.dataClassSelector.currentText
     parameterNode.SetParameter(self.logic.DATA_CLASS, dataClass)
 
-  def onSampleDurationSelectorChanged(self):
+  def onSamplingDurationChanged(self):
     self.updateParameterNodeFromGUI()
     parameterNode = self.logic.getParameterNode()
-    sampleDuration = self.ui.sampleDurationSelector.currentText
-    parameterNode.SetParameter(self.logic.SAMPLE_DURATION, sampleDuration)
+    # sampleDuration = self.ui.sampleDurationSelector.currentText
+    sampleDuration = self.ui.samplingDurationSlider.value
+    parameterNode.SetParameter(self.logic.SAMPLING_DURATION, str(sampleDuration))
 
-  def onSamplePerSecondSelectorChanged(self):
+  def onSamplingRateChanged(self):
     self.updateParameterNodeFromGUI()
     parameterNode = self.logic.getParameterNode()
-    sampleRate = self.ui.samplePerSecondSelector.currentText
-    parameterNode.SetParameter(self.logic.SAMPLE_PER_SECOND, sampleRate)
+    # sampleRate = self.ui.samplePerSecondSelector.currentText
+    sampleRate = self.ui.samplingRateSlider.value
+    print("sample rate is: ", sampleRate)
+    parameterNode.SetParameter(self.logic.SAMPLING_RATE, str(sampleRate))
 
   def onCollectSampleButtonClicked(self):
     self.updateParameterNodeFromGUI()
@@ -383,6 +390,9 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     parameterNode.SetParameter(self.logic.PLOTTING_STATE, str(self.ui.enablePlottingButton.isChecked()))
     # update parameter node with the current path of the file selector
     parameterNode.SetParameter(self.logic.MODEL_PATH, self.ui.modelFileSelector.currentPath)
+    # update parameter node with the current sampling duration and samplling rate
+    parameterNode.SetParameter(self.logic.SAMPLING_DURATION, str(self.ui.samplingDurationSlider.value))
+    parameterNode.SetParameter(self.logic.SAMPLING_RATE, str(self.ui.samplingRateSlider.value))
 
     self._parameterNode.EndModify(wasModified)
  
@@ -446,8 +456,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   SCANNING_STATE = 'Scanning State'
   PLOTTING_STATE = 'Plotting State'
   CLICK_COUNT = 'Click Count'
-  SAMPLE_DURATION = "Sample Duration"
-  SAMPLE_PER_SECOND = "Sample Rate"
+  SAMPLING_DURATION = "Sample Duration"
+  SAMPLING_RATE = "Sample Rate"
   DATA_CLASS = "Data Class"
   SAVE_LOCATION = 'Save Location'
 
@@ -603,29 +613,11 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     pass
 
   def recordSample(self):
-    # In this module I will collect X spectra over Y seconds using a sequence object
-    # I will then save them to a csv with the label given by the class selector
-
-    # Load in the parameters
-    parameterNode = self.getParameterNode()
-    dataLabel = parameterNode.GetParameter(self.DATA_CLASS)
-    sampleDuration = parameterNode.GetParameter(self.SAMPLE_DURATION)
-    sampleFrequency = parameterNode.GetParameter(self.SAMPLE_PER_SECOND)
-    image_imageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
-    browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
-
-    print("Collecting sample")
-    # Print sampleDuration
-    print("Sample duration: " + sampleDuration)
-
-    if browserNode == None:
-      browserNode = slicer.vtkMRMLSequenceBrowserNode()
-      slicer.mrmlScene.AddNode(browserNode)
-      browserNode.SetName("SampleSequenceBrowser")
-      parameterNode.SetNodeReferenceID(self.SAMPLE_SEQ_BROWSER, browserNode.GetID())
-
     '''
-    There is a brwoser and a sequence
+    This function will record an N second sample of spectral data, it then calls saveSample to save the data to a csv file.
+
+    NOTE:
+    There is a browser and a sequence
     SetPlayback
     SetRecordingActive  
     The goal is to create a a sequencec of spectra using the sequence browser over 1 section and then save it to a csv
@@ -634,38 +626,95 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     seqBrowserNode.RemoveAllProxyNodes()
     image.EndModify(0) # when the second seq is created I think it modifys the first and then the second is ended. When things stop modifying call this. 
     '''
-    # Instantiate sequenceLogic
-    sequenceLogic = slicer.modules.sequences.logic()
-    # Only call this once, check to see if the sequence already exists
-    # save seq ID to parameter node
+    # Load in the parameters
+    parameterNode = self.getParameterNode()
+    sampleDuration = parameterNode.GetParameter(self.SAMPLING_DURATION)
+    sampleFrequency = parameterNode.GetParameter(self.SAMPLING_RATE)
+    image_imageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
+    # Print Collecting sample and the data collection parameters
+    print('Collecting sample')
+    print('Sample duration: ' + sampleDuration)
+    print('Sample frequency: ' + sampleFrequency)
+    if browserNode == None:
+      browserNode = slicer.vtkMRMLSequenceBrowserNode()
+      slicer.mrmlScene.AddNode(browserNode)
+      browserNode.SetName("SampleSequenceBrowser")
+      parameterNode.SetNodeReferenceID(self.SAMPLE_SEQ_BROWSER, browserNode.GetID())
+    # Check to see if our sequence node exists yet
     if parameterNode.GetNodeReferenceID(self.SAMPLE_SEQUENCE) is None:
+      sequenceLogic = slicer.modules.sequences.logic()
       sequenceNode = sequenceLogic.AddSynchronizedNode(None, image_imageNode, browserNode) # Check doc on AddSynchronizedNode to see if there is another way.
       parameterNode.SetNodeReferenceID(self.SAMPLE_SEQUENCE, sequenceNode.GetID())
     sequenceNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
-    # Print clearing sequence node
+    # Clear the sequence node of previous data
     sequenceNode.RemoveAllDataNodes()
-
-
+    # Initalize the sequence node parameters
     browserNode.SetRecording(sequenceNode, True)
     browserNode.SetPlayback(sequenceNode, True)
-    # set the fps
     browserNode.SetPlaybackRateFps(float(sampleFrequency))
+    # Start the recording
     browserNode.SetRecordingActive(True)
     timer = qt.QTimer()
     # NOTE: singleShot will proceed with the next lines of code before the timer is done
-
-    # timer.singleShot(float(sampleDuration)*1000+50, lambda: browserNode.SetRecordingActive(False)) # can create a new function here for print statements
+    # Call a singleShot to stop the recording after the sample duration
+    timer.singleShot(float(sampleDuration)*1000, lambda: browserNode.SetRecordingActive(False))
+    # Save the sample slightly after the recording is stopped
     timer.singleShot(float(sampleDuration)*1000+50, lambda: self.saveSample())
 
+  def startDataCollection(self):
+    # Load in the parameters
+    parameterNode = self.getParameterNode()
+    sampleFrequency = parameterNode.GetParameter(self.SAMPLING_RATE)
+    image_imageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
+    browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
+    # Print Collecting sample and the data collection parameters
+    print('Starting Collection')
+    print('Sample frequency: ' + sampleFrequency)
+    if browserNode == None:
+      browserNode = slicer.vtkMRMLSequenceBrowserNode()
+      slicer.mrmlScene.AddNode(browserNode)
+      browserNode.SetName("SampleSequenceBrowser")
+      parameterNode.SetNodeReferenceID(self.SAMPLE_SEQ_BROWSER, browserNode.GetID())
+    # Check to see if our sequence node exists yet
+    if parameterNode.GetNodeReferenceID(self.SAMPLE_SEQUENCE) is None:
+      sequenceLogic = slicer.modules.sequences.logic()
+      sequenceNode = sequenceLogic.AddSynchronizedNode(None, image_imageNode, browserNode) # Check doc on AddSynchronizedNode to see if there is another way.
+      parameterNode.SetNodeReferenceID(self.SAMPLE_SEQUENCE, sequenceNode.GetID())
+    sequenceNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
+    # Clear the sequence node of previous data
+    sequenceNode.RemoveAllDataNodes()
+    # Initalize the sequence node parameters
+    browserNode.SetRecording(sequenceNode, True)
+    browserNode.SetPlayback(sequenceNode, True)
+    browserNode.SetPlaybackRateFps(float(sampleFrequency))
+    # Start the recording
+    browserNode.SetRecordingActive(True)
+    pass
+
+  def stopDataCollection(self):
+    print('Stopping Collection')
+    # Load in the parameters
+    parameterNode = self.getParameterNode()
+    browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
+    # Stop the recording
+    browserNode.SetRecordingActive(False)
+    # Save the sample to csv
+    self.saveSample()
+    pass
 
   def saveSample(self):
+    '''
+    Saves the data stored in the SampleSequenceBrowse to a single csv file
+    '''
     # get parameters
     parameterNode = self.getParameterNode()
     dataLabel = parameterNode.GetParameter(self.DATA_CLASS)
-    sampleDuration = parameterNode.GetParameter(self.SAMPLE_DURATION)
+    sampleDuration = parameterNode.GetParameter(self.SAMPLING_DURATION)
     # Stop the timer
     browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
-    browserNode.SetRecordingActive(False)
+    # browserNode.SetRecordingActive(False)
+    print("Recording stopped")
     # Get the sequence node
     sequenceNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
     # Save the sequence to a csv
@@ -673,6 +722,13 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     savePath = os.path.join(savePath, dataLabel)
     # Loop through the sequence
     sequenceLength = sequenceNode.GetNumberOfDataNodes()
+
+    # Check to see if any data has been recorded
+    if sequenceLength == 0:
+      print("No data to save")
+      return
+
+    print(sequenceLength)
     # Format the empty array
     # Get the length of a spectrum
     spectrumArray = slicer.util.arrayFromVolume(sequenceNode.GetNthDataNode(0))
@@ -692,10 +748,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       spectrumArray2D[i+1,1:] = spectrumArray[1,:]
     # Save the array to a csv
     clickCount = parameterNode.GetParameter(self.CLICK_COUNT)
-    np.savetxt(savePath + '.csv', spectrumArray2D[1:,:], delimiter=",")
     # np.savetxt(savePath + clickCount + '.csv', spectrumArray2D[1:,:], delimiter=",")
-
-
+    np.savetxt(savePath + '.csv', spectrumArray2D[1:,:], delimiter=",")
 
   def addControlPointToToolTip(self):
     # Get the required nodes
@@ -727,6 +781,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       pointListRed_World.AddControlPoint(tip_World)
       pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
       # parameterNode.SetParameter('LastPointAdded', self.logic.CLASS_LABEL_1)
+    pass
 
   def onSpectrumImageNodeModified(self, observer, eventid):
     self.setupLists()

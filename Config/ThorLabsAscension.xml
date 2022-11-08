@@ -7,9 +7,10 @@
     <Device
       Id="VideoDevice" 
       Type="ThorLabsVideo"
-
-	  IntegrationTimeSec = "0.05"
-	  > <!-- IntegrationTimeSec default is 0.05 -->
+	  AcquisitionRate="100"
+	  IntegrationTimeSec="0.1"
+	  Zebra = "1"
+	  > <!-- IntegrationTimeSec default="0.05" --> <!-- AcquisitionRate Default="30" -->
       <DataSources>
         <DataSource 
 		   Type="Video" 
@@ -28,12 +29,12 @@
       ToolReferenceFrame="Tracker" >
       <DataSources>
         <DataSource Type="Tool" Id="Probe" PortName="0"  />
-        <DataSource Type="Tool" Id="Reference" PortName="1"  />
+        <!-- <DataSource Type="Tool" Id="Reference" PortName="1"  /> -->
       </DataSources>
       <OutputChannels>
         <OutputChannel Id="TrackerStream" >
           <DataSource Id="Probe"/>
-          <DataSource Id="Reference"/>
+          <!-- <DataSource Id="Reference"/> -->
         </OutputChannel>
       </OutputChannels>
     </Device>
@@ -66,8 +67,8 @@
       </ImageNames>
 	  <TransformNames> 
         <Transform Name="ProbeToTracker" />
-        <Transform Name="ReferenceToTracker" />
-	    <Transform Name="ProbeToReference" />
+        <!-- <Transform Name="ReferenceToTracker" /> -->
+	    <!-- <Transform Name="ProbeToReference" /> -->
       </TransformNames>
     </DefaultClientInfo>
   </PlusOpenIGTLinkServer>
