@@ -9,8 +9,9 @@
       Type="ThorLabsVideo"
 	  AcquisitionRate="100"
 	  IntegrationTimeSec="0.1"
+	  AveragedItemsForFiltering="1"
 	  Zebra = "1"
-	  > <!-- IntegrationTimeSec default="0.05" --> <!-- AcquisitionRate Default="30" -->
+	  > <!-- IntegrationTimeSec default="0.05" --> <!-- AcquisitionRate Default="30" --> <!--  AveragedItemsForFiltering Default="20"-->
       <DataSources>
         <DataSource 
 		   Type="Video" 

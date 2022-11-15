@@ -140,6 +140,19 @@
     </widget>
    </item>
    <item>
+    <widget class="QPushButton" name="enableClassificationButton">
+     <property name="text">
+      <string>Enable Classification</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="ctkCollapsibleButton" name="dataCollectionSection_2">
      <property name="enabled">
       <bool>true</bool>
