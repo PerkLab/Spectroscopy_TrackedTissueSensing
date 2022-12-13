@@ -128,10 +128,10 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.ui.dataClassSelector.addItem("Normal")
     self.ui.patientNumberSelector.connect('currentIndexChanged(int)', self.onPatientNumberSelectorChanged)
     # add the options Patient1 the patient number selector
-    self.ui.patientNumberSelector.addItem("Patient1")
+    self.ui.patientNumberSelector.addItem("PatientA")
     # self.ui.saveLocationSelector.connect('currentPathChanged(QString)', self.onSaveLocationSelectorChanged)
     self.ui.saveDirectoryButton.connect('directorySelected(QString)', self.onSaveDirectoryButtonClicked)
-    # update the saveDirectory using parameter node to the self.logic.SAVE_LOCATION
+    # update the saveDirectory using parameter node to the self.logic.SAVE_LOCATION *** Change this to use settings
     self.ui.saveDirectoryButton.directory = self._parameterNode.GetParameter(self.logic.SAVE_LOCATION)
 
     self.ui.samplingDurationSlider.connect('valueChanged(double)', self.onSamplingDurationChanged)
@@ -808,13 +808,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     parameterNode = self.getParameterNode()
     dataLabel = parameterNode.GetParameter(self.DATA_CLASS)
     sampleDuration = parameterNode.GetParameter(self.SAMPLING_DURATION)
-    # Stop the timer
-    browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
     # Get the sequence node
     sequenceNode = parameterNode.GetNodeReference(self.SAMPLE_SEQUENCE)
-    # Save the sequence to a csv
-    savePath = parameterNode.GetParameter(self.SAVE_LOCATION)
-    savePath = os.path.join(savePath, dataLabel)
+
     # Loop through the sequence
     sequenceLength = sequenceNode.GetNumberOfDataNodes()
 
@@ -840,17 +836,21 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       # Get a spectrum as an array
       spectrumArray = np.squeeze(slicer.util.arrayFromVolume(sequenceNode.GetNthDataNode(i)))
       spectrumArray2D[i+1,1:] = spectrumArray[1,:]
-    # Save the array to a csv
+    
+    # Create the file path to save to. Date->PatientID->Class
+    savePath = parameterNode.GetParameter(self.SAVE_LOCATION)
+    dateStamp = time.strftime("%b%d")
+    patientNum = parameterNode.GetParameter(self.PATIENT_NUM)
+    savePath = os.path.join(savePath, dateStamp,patientNum,dataLabel)
     # If the save path does not exist, create it
     if not os.path.exists(savePath):
       os.makedirs(savePath)
     
+    # Save the array to a csv
     '''File naming convention: TimeStamp_Patient#_#ofFiles_DataLabel.csv with TimeStamp in the format of MMMDD'''
     # timestamp
-    timeStamp = time.strftime("%b%d")
     FileNum = len([name for name in os.listdir(savePath) if os.path.isfile(os.path.join(savePath, name))]) + 1 # Get the file number
-    patientNum = parameterNode.GetParameter(self.PATIENT_NUM) 
-    fileName = timeStamp + "_" + patientNum + "_" + str(FileNum).zfill(3) + "_" + dataLabel + ".csv"
+    fileName = dateStamp + "_" + patientNum + "_" + str(FileNum).zfill(3) + "_" + dataLabel + ".csv"
 
     # fileName = dataLabel + '_' + str(numFiles).zfill(3) + '.csv'
     np.savetxt(os.path.join(savePath, fileName), spectrumArray2D[:,:], delimiter=",")

@@ -315,19 +315,6 @@
         </property>
        </widget>
       </item>
-      <item row="4" column="1">
-       <widget class="ctkPathLineEdit" name="saveLocationSelector">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <property name="acceptDrops">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="1">
-       <widget class="ctkDirectoryButton" name="saveDirectoryButton"/>
-      </item>
       <item row="6" column="0">
        <widget class="QLabel" name="label_23">
         <property name="text">
@@ -358,6 +345,9 @@
          <bool>true</bool>
         </property>
        </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="ctkDirectoryButton" name="saveDirectoryButton"/>
       </item>
      </layout>
     </widget>
