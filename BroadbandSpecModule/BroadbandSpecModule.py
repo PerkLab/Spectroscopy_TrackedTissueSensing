@@ -4,7 +4,6 @@ import logging
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-import sklearn
 import numpy as np
 import os
 import time
@@ -12,12 +11,16 @@ try:
   from joblib import load
 except:
   slicer.util.pip_install('joblib')
+  from joblib import load
   pass
 try:
   import sklearn
 except:
-  slicer.util.pip_install('sklearn')
+  slicer.util.pip_install('scikit-learn')
+  import sklearn
+  print('here')
   pass
+  # pass
 # This is a custom library which slicer doesnt recognize on startup
 try:
   import Processfunctions as process
