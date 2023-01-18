@@ -134,14 +134,23 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.ui.patientNumberSelector.addItem("PatientA")
     # self.ui.saveLocationSelector.connect('currentPathChanged(QString)', self.onSaveLocationSelectorChanged)
     self.ui.saveDirectoryButton.connect('directorySelected(QString)', self.onSaveDirectoryButtonClicked)
-    # update the saveDirectory using parameter node to the self.logic.SAVE_LOCATION *** Change this to use settings
-    self.ui.saveDirectoryButton.directory = self._parameterNode.GetParameter(self.logic.SAVE_LOCATION)
 
     self.ui.samplingDurationSlider.connect('valueChanged(double)', self.onSamplingDurationChanged)
     self.ui.samplingRateSlider.connect('valueChanged(double)', self.onSamplingRateChanged)
     self.ui.collectSampleButton.connect('clicked(bool)', self.onCollectSampleButtonClicked)
     self.ui.continuousCollectionButton.connect('clicked(bool)', self.onContinuousCollectionButtonClicked)
 
+    self.initializeGUI()
+
+  def initializeGUI(self):
+    # get the paths saved in settings
+    # initailize the save directory using settings
+    settings = slicer.app.userSettings()
+    if settings.value(self.logic.SAVE_LOCATION): # if the settings exists
+      self.ui.saveDirectoryButton.directory = settings.value(self.logic.SAVE_LOCATION)
+    # initailize the path to current model
+    if settings.value(self.logic.MODEL_PATH):
+      self.ui.modelFileSelector.setCurrentPath(settings.value(self.logic.MODEL_PATH))
 
   def initializeScene(self):
         # NeedleModel
@@ -260,16 +269,12 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         pointList_NeedleTip.SetAndObserveTransformNodeID(transformNode.GetID())
 
 
-  def onSaveDirectoryButtonClicked(self):
-    self.updateParameterNodeFromGUI()
-    # get the path from the button
-    path = self.ui.saveDirectoryButton.directory
+  def onSaveDirectoryButtonClicked(self, directory):
+    # update settings with the new directory
+    settings = slicer.app.userSettings()
+    settings.setValue(self.logic.SAVE_LOCATION, directory)
     # Print the save directory 
-    print('Save directory: ' + path)
-    # Save that path to the parameter node
-    parameterNode = self.logic.getParameterNode()
-    parameterNode.SetParameter(self.logic.SAVE_LOCATION, path)
-    # pass
+    print('Save directory: ' + directory)
 
   def onSpectrumImageChanged(self):
     self.updateParameterNodeFromGUI()
@@ -277,17 +282,13 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
   def onOutputTableChanged(self):
     self.updateParameterNodeFromGUI()
 
-  def onModelFileSelectorChanged(self):
-    # Update the parameter node from the GUI
-    self.updateParameterNodeFromGUI()
-    # get the file from the modelFileSelector
-    modelPath = self.ui.modelFileSelector.currentPath
-    # update the parameter node with the new model path
-    parameterNode = self.logic.getParameterNode()
-    parameterNode.SetParameter(self.logic.MODEL_PATH, modelPath)
-    print('Loading in model from path:', modelPath)
-    if not (modelPath == ''): 
-      self.logic.model = load(modelPath)
+  def onModelFileSelectorChanged(self, path):
+    # update settings with the new model path
+    settings = slicer.app.userSettings()
+    settings.setValue(self.logic.MODEL_PATH, path)
+    print('Loading in model from path:', path)
+    if not (path == ''): 
+      self.logic.model = load(path)
 
   def onPlaceFiducialButtonClicked(self):
     self.updateParameterNodeFromGUI()
@@ -383,14 +384,6 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         slicer.mrmlScene.AddNode(firstTableNode)
         self._parameterNode.SetNodeReferenceID(self.logic.OUTPUT_TABLE, firstTableNode.GetID())
 
-    # If no model path is selected, select the default one
-    if self._parameterNode.GetNodeReference(self.logic.MODEL_PATH) is None:
-      self._parameterNode.SetParameter(self.logic.MODEL_PATH, self.logic.DEFAULT_MODEL_PATH)
-
-    # Add a default save location if none exists
-    if self._parameterNode.GetNodeReference(self.logic.SAVE_LOCATION) is None:
-      self._parameterNode.SetParameter(self.logic.SAVE_LOCATION, self.logic.DEFAULT_SAVE_LOCATION)
-
   def updateGUIFromParameterNode(self, caller=None, event=None):
     """
     This method is called whenever parameter node is changed.
@@ -418,11 +411,6 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.ui.connectButton.text = 'Connect'
       else:
         self.ui.connectButton.text = 'Disconnect' 
-
-    # Update the model path to be the last selection
-    if self.ui.modelFileSelector.currentPath == '':
-      # set the current path to whatever is stored in the parameter node
-      self.ui.modelFileSelector.currentPath = self._parameterNode.GetParameter(self.logic.MODEL_PATH)
 
     # All the GUI updates are done
     self._updatingGUIFromParameterNode = False
@@ -533,9 +521,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   CLASS_LABEL_1 = "ClassLabel1"                   # The label of the second class
   CLASS_LABEL_NONE = "WeakSignal"                 # The label of the class when the signal is too weak
   DISTANCE_THRESHOLD = 1 # in mm
-  # DEFAULT_SAVE_LOCATION = os.path.join('C:\Spectroscopy_TrackedTissueSensing\data', 'Nov2022_skinTestData')
-  DEFAULT_MODEL_PATH = os.path.join('C:\Spectroscopy_TrackedTissueSensing\TrainedModels', 'KNN_WhiteVsBlue2.joblib')
-  DEFAULT_SAVE_LOCATION = os.path.join('C:\Spectroscopy_TrackedTissueSensing\data', 'SkinDataCollection')
 
   def __init__(self):
     """
@@ -562,12 +547,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     """
     if not parameterNode.GetParameter(self.CLASSIFICATION):
       parameterNode.SetParameter(self.CLASSIFICATION, '')
-    # if the self.model path is not set, grab it from the ctkPathLineEdit widget
-    if parameterNode.GetParameter(self.MODEL_PATH) == '':
-      parameterNode.SetParameter(self.MODEL_PATH, self.DEFAULT_MODEL_PATH)
-    if self.model == None:
-      modelPath = parameterNode.GetParameter(self.MODEL_PATH)
-      self.model = load(modelPath)
 
   def process(self, inputVolume, outputTable, imageThreshold, invert=False, showResult=True):
     """
