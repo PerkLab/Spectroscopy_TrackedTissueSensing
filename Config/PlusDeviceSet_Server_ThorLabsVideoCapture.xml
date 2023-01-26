@@ -6,7 +6,11 @@
       Description="Broadcasting acquired spectrum through OpenIGTLink. First image row contains wavelength value, second image row contains intensities." />
     <Device
       Id="VideoDevice" 
-      Type="ThorLabsVideo" >
+      Type="ThorLabsVideo"
+          AcquisitionRate="30"
+	  IntegrationTimeSec="0.025"
+	  AveragedItemsForFiltering="1"
+	  > <!-- IntegrationTimeSec default="0.05" --> <!-- AcquisitionRate Default="30" --> <!--  AveragedItemsForFiltering Default="20"-->
       <DataSources>
         <DataSource Type="Video" Id="Video" />
       </DataSources>      

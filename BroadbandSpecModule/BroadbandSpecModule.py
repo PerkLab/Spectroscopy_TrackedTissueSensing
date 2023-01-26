@@ -754,8 +754,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
     # Print Collecting sample and the data collection parameters
     print('Collecting sample')
-    # print('Sample duration: ' + sampleDuration)
-    # print('Sample frequency: ' + sampleFrequency)
     if browserNode == None:
       browserNode = slicer.vtkMRMLSequenceBrowserNode()
       slicer.mrmlScene.AddNode(browserNode)
@@ -820,10 +818,15 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       spectrumArray2D[i+1,1:] = spectrumArray[1,:]
     
     # Create the file path to save to. Date->PatientID->Class
-    savePath = parameterNode.GetParameter(self.SAVE_LOCATION)
+    # Get the save path from settings
+    settings = qt.QSettings()
+    savePath = settings.value(self.SAVE_LOCATION)
+    print(savePath)
     dateStamp = time.strftime("%b%d")
     patientNum = parameterNode.GetParameter(self.PATIENT_NUM)
     savePath = os.path.join(savePath, dateStamp,patientNum,dataLabel)
+    # print save path
+    print("Saving to: " + savePath)
     # If the save path does not exist, create it
     if not os.path.exists(savePath):
       os.makedirs(savePath)

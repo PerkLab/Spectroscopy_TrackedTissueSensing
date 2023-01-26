@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>606</width>
-    <height>702</height>
+    <height>673</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -307,10 +307,10 @@
          <double>1.000000000000000</double>
         </property>
         <property name="maximum">
-         <double>30.000000000000000</double>
+         <double>100.000000000000000</double>
         </property>
         <property name="value">
-         <double>30.000000000000000</double>
+         <double>100.000000000000000</double>
         </property>
         <property name="quantity">
          <string notr="true"/>
