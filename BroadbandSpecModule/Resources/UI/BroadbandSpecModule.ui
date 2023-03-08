@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>606</width>
-    <height>673</height>
+    <width>426</width>
+    <height>682</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -15,6 +15,12 @@
     <widget class="ctkCollapsibleButton" name="setupSection">
      <property name="enabled">
       <bool>true</bool>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
      </property>
      <property name="text">
       <string>Setup</string>
@@ -32,6 +38,12 @@
       </item>
       <item row="0" column="1">
        <widget class="QPushButton" name="connectButton">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="text">
          <string>Connect</string>
         </property>
@@ -48,6 +60,12 @@
        <widget class="qMRMLNodeComboBox" name="spectrumImageSelector">
         <property name="enabled">
          <bool>true</bool>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
         </property>
         <property name="toolTip">
          <string>Pick the input to the algorithm.</string>
@@ -86,6 +104,12 @@
         <property name="enabled">
          <bool>true</bool>
         </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="toolTip">
          <string>Add a tool tip</string>
         </property>
@@ -114,6 +138,12 @@
         <property name="enabled">
          <bool>true</bool>
         </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="acceptDrops">
          <bool>true</bool>
         </property>
@@ -121,6 +151,12 @@
       </item>
       <item row="4" column="1">
        <widget class="QPushButton" name="placeFiducialButton">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="text">
          <string>Place fiducial at tip</string>
         </property>
@@ -131,6 +167,12 @@
    </item>
    <item>
     <widget class="QPushButton" name="enablePlottingButton">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="text">
       <string>Enable Plotting</string>
      </property>
@@ -144,6 +186,12 @@
    </item>
    <item>
     <widget class="QPushButton" name="enableClassificationButton">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="text">
       <string>Enable Classification</string>
      </property>
@@ -160,11 +208,17 @@
      <property name="enabled">
       <bool>true</bool>
      </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="text">
       <string>Inference</string>
      </property>
      <property name="checked">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <layout class="QFormLayout" name="formLayout_6">
       <item row="1" column="1">
@@ -199,6 +253,12 @@
       </item>
       <item row="0" column="1">
        <widget class="QPushButton" name="addControlPointButton">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="text">
          <string>Point Scan</string>
         </property>
@@ -209,6 +269,12 @@
    </item>
    <item>
     <widget class="ctkCollapsibleButton" name="dataCollectionSection">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="text">
       <string>Data Collection</string>
      </property>
@@ -222,6 +288,12 @@
       </item>
       <item row="0" column="1">
        <widget class="QComboBox" name="dataClassSelector">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="editable">
          <bool>true</bool>
         </property>
@@ -233,12 +305,18 @@
       <item row="1" column="0">
        <widget class="QLabel" name="label_4">
         <property name="text">
-         <string>Patient Label</string>
+         <string>Patient ID</string>
         </property>
        </widget>
       </item>
       <item row="1" column="1">
        <widget class="QComboBox" name="patientNumberSelector">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="editable">
          <bool>true</bool>
         </property>
