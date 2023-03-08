@@ -18,9 +18,7 @@ try:
 except:
   slicer.util.pip_install('scikit-learn')
   import sklearn
-  print('here')
-  pass
-  # pass
+
 # This is a custom library which slicer doesnt recognize on startup
 try:
   import Processfunctions as process
@@ -152,6 +150,24 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     if settings.value(self.logic.MODEL_PATH):
       self.ui.modelFileSelector.setCurrentPath(settings.value(self.logic.MODEL_PATH))
 
+    # initialize the button states using parameter node
+    # if the parameter is not None, then set the button state to the value of the parameter
+    # if self._parameterNode.GetParameter(self.logic.PLOTTING_STATE) is not None:
+    #   # run button clicked function
+    #   self.setEnablePlotting(self._parameterNode.GetParameter(self.logic.PLOTTING_STATE))
+      
+    # if self._parameterNode.GetParameter(self.logic.CLASSIFYING_STATE) is not None:
+    #   self.ui.enableClassificationButton.checked = self._parameterNode.GetParameter(self.logic.CLASSIFYING_STATE)
+    
+    # # connect button
+    # if self._parameterNode.GetParameter(self.logic.CONNECTED) is not None:
+    #   self.ui.connectButton.checked = self._parameterNode.GetParameter(self.logic.CONNECTED)
+
+    # Initialize the savingFlag to False in the parameter node
+    self._parameterNode.SetParameter(self.logic.SAVING_STATE, "False")
+
+
+
   def initializeScene(self):
         # NeedleModel
 
@@ -219,9 +235,19 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     sampleRate = self.ui.samplingRateSlider.value
     parameterNode.SetParameter(self.logic.SAMPLING_RATE, str(sampleRate))
 
-  def onCollectSampleButtonClicked(self):
+  def onCollectSampleButtonClicked(self,enable):
     self.updateParameterNodeFromGUI()
+    # update the parameter node
+    parameterNode = self.logic.getParameterNode()
+    parameterNode.SetParameter(self.logic.SAVING_STATE, str(enable))
+    sampleDuration = parameterNode.GetParameter(self.logic.SAMPLING_DURATION)
+    # disable the button
+    self.ui.collectSampleButton.setEnabled(False)
     self.logic.recordSample()
+    # # start a timer to enable the button after 1 second
+    timer = qt.QTimer()
+    timer.singleShot(float(sampleDuration)*1000+50, lambda: self.ui.collectSampleButton.setEnabled(True))
+
 
   def onConnectButtonClicked(self):
     '''
@@ -412,6 +438,21 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       else:
         self.ui.connectButton.text = 'Disconnect' 
 
+    # # If SAVING_STATE is not none
+    # if self._parameterNode.GetParameter(self.logic.SAVING_STATE) is not None:
+    #   # If SAVING_STATE is true
+    #   if self._parameterNode.GetParameter(self.logic.SAVING_STATE) == 'True':
+    #     # change the button text to 'Saving'
+    #     self.ui.collectSampleButton.text = 'Saving'
+    #     # disable the button
+    #     self.ui.collectSampleButton.enabled = False
+    #   # If SAVING_STATE is false
+    #   else:
+    #     # change the button text to 'Collect Sample'
+    #     self.ui.collectSampleButton.text = 'Collect Sample'
+    #     # enable the button
+    #     self.ui.collectSampleButton.enabled = True
+
     # All the GUI updates are done
     self._updatingGUIFromParameterNode = False
 
@@ -439,6 +480,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     # update parameter node with the current sampling duration and samplling rate
     parameterNode.SetParameter(self.logic.SAMPLING_DURATION, str(self.ui.samplingDurationSlider.value))
     parameterNode.SetParameter(self.logic.SAMPLING_RATE, str(self.ui.samplingRateSlider.value))
+    
 
     self._parameterNode.EndModify(wasModified)
  
@@ -494,9 +536,12 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   # NAMES
   MODEL_PATH = "ModelPath"                        # Parameter stores the path to the classifier
   CLASSIFICATION = "Classification"               # Parameter stores the classification result
+  
   SCANNING_STATE = 'Scanning State'               # Parameter stores whether the scanning is on or off
   PLOTTING_STATE = 'Plotting State'               # Parameter stores whether the plotting is on or off
   CLASSIFYING_STATE = 'Classifying State'         # Parameter stores whether the classification is on or off
+  SAVING_STATE = 'Saving State'                   # Parameter stores whether saving is occuring 
+
   SAMPLING_DURATION = "Sample Duration"           # Parameter stores the duration of the sampling
   SAMPLING_RATE = "Sample Rate"                   # Parameter stores the rate of the sampling
   DATA_CLASS = "Data Class"                       # Parameter stores the data class we are recording
@@ -521,6 +566,10 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   CLASS_LABEL_1 = "ClassLabel1"                   # The label of the second class
   CLASS_LABEL_NONE = "WeakSignal"                 # The label of the class when the signal is too weak
   DISTANCE_THRESHOLD = 1 # in mm
+
+
+
+
 
   def __init__(self):
     """
@@ -753,7 +802,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     image_imageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
     # Print Collecting sample and the data collection parameters
-    print('Collecting sample')
+    
     if browserNode == None:
       browserNode = slicer.vtkMRMLSequenceBrowserNode()
       slicer.mrmlScene.AddNode(browserNode)
@@ -773,12 +822,18 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     browserNode.SetPlaybackRateFps(float(sampleFrequency))
     # Start the recording
     browserNode.SetRecordingActive(True)
-    timer = qt.QTimer()
+    # print('Collecting sample')
+    self.timer = qt.QTimer()
     # NOTE: singleShot will proceed with the next lines of code before the timer is done
     # Call a singleShot to stop the recording after the sample duration
-    timer.singleShot(float(sampleDuration)*1000, lambda: browserNode.SetRecordingActive(False))
+    self.timer.singleShot(float(sampleDuration)*1000, lambda: browserNode.SetRecordingActive(False))
+    # self.timer.connect('timeout()', self.saveSample)
+    
     # Save the sample slightly after the recording is stopped
-    timer.singleShot(float(sampleDuration)*1000+50, lambda: self.saveSample())
+    self.timer.singleShot(float(sampleDuration)*1000+50, lambda: self.saveSample())
+
+    # Get the remaining time in the timer
+    # self.timer.remainingTime()
 
   def saveSample(self):
     '''
@@ -798,9 +853,10 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # Check to see if any data has been recorded
     if sequenceLength == 0:
       print("No data to save")
+      # update SAVING_STATE to false
+      # parameterNode.SetParameter(self.SAVING_STATE, 'False')
       return
 
-    # print("Sequence length: " + str(sequenceLength))
     # Format the empty array
     spectrumArray = slicer.util.arrayFromVolume(sequenceNode.GetNthDataNode(0)) # Get the length of a spectrum
     SpectrumLength = spectrumArray.shape[2]
@@ -808,9 +864,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     timeVector = np.linspace(0, float(sampleDuration), sequenceLength)          # create a time vector using the sampleDuration
     spectrumArray2D[1:,0] = timeVector                                          # concatenate the time vector to the spectrum array
     waveLengthVector = spectrumArray[0,0,:]
-    # print(waveLengthVector.shape)
     spectrumArray2D[0,1:] = waveLengthVector
-    # print(spectrumArray2D)
 
     for i in range(sequenceLength):
       # Get a spectrum as an array

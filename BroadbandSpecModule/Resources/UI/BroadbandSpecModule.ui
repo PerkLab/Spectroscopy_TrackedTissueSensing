@@ -26,7 +26,7 @@
       <string>Setup</string>
      </property>
      <property name="checked">
-      <bool>true</bool>
+      <bool>false</bool>
      </property>
      <layout class="QFormLayout" name="formLayout_2">
       <item row="0" column="0">
@@ -413,6 +413,9 @@
        <widget class="QPushButton" name="collectSampleButton">
         <property name="text">
          <string>Collect Sample</string>
+        </property>
+        <property name="checkable">
+         <bool>false</bool>
         </property>
        </widget>
       </item>
