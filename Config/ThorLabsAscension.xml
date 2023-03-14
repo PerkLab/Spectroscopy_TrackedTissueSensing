@@ -7,9 +7,9 @@
     <Device
       Id="VideoDevice" 
       Type="ThorLabsVideo"
-	  AcquisitionRate="100"
+	  AcquisitionRate="30"
 	  IntegrationTimeSec="0.01"
-	  AveragedItemsForFiltering="1"
+	  AveragedItemsForFiltering="20"
 	  > <!-- IntegrationTimeSec default="0.05" --> <!-- AcquisitionRate Default="30" --> <!--  AveragedItemsForFiltering Default="20"-->
       <DataSources>
         <DataSource 
