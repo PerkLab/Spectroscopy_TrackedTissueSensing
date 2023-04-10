@@ -12,7 +12,3 @@ The approach is to create a 3D slicer module to interface with the devices in re
 
 ### Resources
 Data is found in p drive: P:\data\BroadbandSpecData
-
-This is a test commit. To be reverted
-
-This is commit 2
