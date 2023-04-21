@@ -741,7 +741,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     specArray = slicer.util.arrayFromVolume(spectrumImageNode)
     specArray = np.squeeze(specArray)
     specArray = np.transpose(specArray)
-    self.classifySpectra(specArray[743:-1,:]) # Magic Number ** Also this is very slow to compute
+    self.classifySpectra(specArray[790:,:]) # Magic Number ** Also this is very slow to compute
     spectrumLabel = parameterNode.GetParameter(self.CLASSIFICATION)
 
     if spectrumLabel == self.CLASS_LABEL_0:
@@ -915,7 +915,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       spectrumArray = self.updateOutputTable()
       # If classification is set to true, then classify the data
       if parameterNode.GetParameter(self.CLASSIFYING_STATE) == "True":
-        self.classifySpectra(spectrumArray[743:-1,:]) # Magic Number **
+        self.classifySpectra(spectrumArray[790:,:]) # Magic Number **
       else:
         # set the classification to 'Classification Disabled'
         parameterNode.SetParameter(self.CLASSIFICATION, "Classifier Disabled")
@@ -1091,7 +1091,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     X_test = X_test[:,1].reshape(1,-1)
     predicted = self.model.predict(X_test)
     # To ensure a strong, unsaturated signal
-    if max_value < 0.1 or max_value > 9.95:
+    if max_value < 0.0 or max_value > 9.95:
       label = self.CLASS_LABEL_NONE
     elif predicted[0] == 0:
       label = self.CLASS_LABEL_0
