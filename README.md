@@ -22,7 +22,11 @@ This codebase contains:
 - 202307 - ExploratoryDataAnalysis-MLpipelineExperimentation.ipynb: Source code for the exploritory data analysis and subsequent experimentation with a preprocessing pipeline
 - 202308 - Thesis-results-generation-AblationStudy.ipynb: Source code used to preprocess, train and evaluate ML models to generate an ablation study of input parameters. 
 
+### Overview of module
+For more detailed information please see chapter __ to __ of the thesis document
 
+
+### Step by step guide of how to operate the module
 
 
 ### Resources
