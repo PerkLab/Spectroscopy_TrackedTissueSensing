@@ -1,5 +1,16 @@
-from array import array
-from calendar import SATURDAY
+'''
+Author: David Morton, Queen's University, PERK Lab and Med-i Lab
+Email: david.morton@queensu.ca
+
+Module Name: BroadbandSpecModule (Navigated tissue sensing module)
+Purpose: To enable the rapid protyping of navigated tissue sensing systems. This module faciliated a live tissue interrogation system which employed an optical spectroscope and electromagnetic tracker.
+Description: Module allows for the collection, classification, and visualization of optical spectroscopy data in real-time.
+  Data Collection - Records and saves spectroscopy data and associated metadata (e.g. PatientID, DataClass, etc.)
+  Model Inference - Classifies the data in real-time using a pre-trained model
+  Visualization - Combines tracking data with classification data to create a localized classification map.
+'''
+
+# Import statements
 import logging
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
@@ -12,31 +23,23 @@ try:
 except:
   slicer.util.pip_install('joblib')
   from joblib import load
-  pass
 try:
   import sklearn
 except:
   slicer.util.pip_install('scikit-learn')
   import sklearn
 
-# This is a custom library which slicer doesnt recognize on startup
-try:
-  import Processfunctions as process
-except:
-  pass
-# import IOfunctions as IO
-
+# Processfunctions is a costume library to include preprocessing pipeline functions
+# Slicer doesnt recognize it on startup so you need to reload the module if in use.
 # try:
-#     import pyigtl
+#   import Processfunctions as process
 # except:
-#     slicer.util.pip_install('pyigtl')
-#     import pyigtl
+#   pass
 
 
 #
 # BroadbandSpecModule
 #
-
 class BroadbandSpecModule(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
@@ -44,7 +47,7 @@ class BroadbandSpecModule(ScriptedLoadableModule):
 
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
-    self.parent.title = "Broadband Spectroscopy"  # TODO: make this more human readable by adding spaces
+    self.parent.title = "Navigated Tissue Sensing"
     self.parent.categories = ["Spectroscopy"]
     self.parent.dependencies = []
     parent.contributors = ["David Morton (Queen's University, PERK Lab)"] 
@@ -61,7 +64,6 @@ class BroadbandSpecModule(ScriptedLoadableModule):
 #
 # BroadbandSpecModuleWidget
 #
-
 class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   """Uses ScriptedLoadableModuleWidget base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
@@ -72,28 +74,25 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     Called when the user opens the module the first time and the widget is initialized.
     """
     ScriptedLoadableModuleWidget.__init__(self, parent)
-    VTKObservationMixin.__init__(self)  # needed for parameter node observation
+    VTKObservationMixin.__init__(self)            # needed for parameter node observation
     self.logic = None
     self._parameterNode = None
     self._updatingGUIFromParameterNode = False
-    slicer.mymod = self # Used to access nodes in the python interactor
+    slicer.mymod = self                           # Used to access nodes in the python interactor for experimentation
 
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
 
     # Load widget from .ui file (created by Qt Designer).
-    # Additional widgets can be instantiated manually and added to self.layout.
     uiWidget = slicer.util.loadUI(self.resourcePath('UI/BroadbandSpecModule.ui'))
     self.layout.addWidget(uiWidget)
     self.ui = slicer.util.childWidgetVariables(uiWidget)
 
     # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
-    # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
-    # "setMRMLScene(vtkMRMLScene*)" slot.
+    # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's "setMRMLScene(vtkMRMLScene*)" slot.
     uiWidget.setMRMLScene(slicer.mrmlScene)
 
-    # Create logic class. Logic implements all computations that should be possible to run
-    # in batch mode, without a graphical user interface.
+    # Create logic class. Logic implements all computations that should be possible to run in batch mode, without a graphical user interface.
     self.logic = BroadbandSpecModuleLogic()
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
@@ -106,10 +105,9 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
     self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
-    # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
-    # (in the selected parameter node).
+    # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene (in the selected parameter node).
 
-    # Setup
+    # Setup tab
     self.ui.connectButton.connect('clicked(bool)', self.onConnectButtonClicked)
     self.ui.spectrumImageSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onSpectrumImageChanged)
     self.ui.outputTableSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onOutputTableChanged)
@@ -117,22 +115,18 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.ui.placeFiducialButton.connect('clicked(bool)', self.onPlaceFiducialButtonClicked)
     self.ui.enablePlottingButton.connect('clicked(bool)', self.setEnablePlotting)
     self.ui.enableClassificationButton.connect('clicked(bool)', self.setEnableClassification)
-    # Inference
+    # Inference tab
     self.ui.scanButton.connect('clicked(bool)', self.onScanButtonClicked)
     self.ui.addControlPointButton.connect('clicked(bool)', self.onAddControlPointButtonClicked)
     self.ui.clearControlPointsButton.connect('clicked(bool)', self.onClearControlPointsButtonClicked)
     self.ui.clearLastPointButton.connect('clicked(bool)', self.onClearLastPointButtonClicked)
-    # Data Collection
+    # Data Collection tab
     self.ui.dataClassSelector.connect('currentIndexChanged(int)', self.onDataClassSelectorChanged)
     # add the options cancer and normal to the data class selector
     self.ui.dataClassSelector.addItem("Cancer")
     self.ui.dataClassSelector.addItem("Normal")
     self.ui.patientNumberSelector.connect('currentIndexChanged(int)', self.onPatientNumberSelectorChanged)
-    # add the options Patient1 the patient number selector
-    self.ui.patientNumberSelector.addItem("PatientA")
-    # self.ui.saveLocationSelector.connect('currentPathChanged(QString)', self.onSaveLocationSelectorChanged)
     self.ui.saveDirectoryButton.connect('directorySelected(QString)', self.onSaveDirectoryButtonClicked)
-
     self.ui.samplingDurationSlider.connect('valueChanged(double)', self.onSamplingDurationChanged)
     self.ui.samplingRateSlider.connect('valueChanged(double)', self.onSamplingRateChanged)
     self.ui.collectSampleButton.connect('clicked(bool)', self.onCollectSampleButtonClicked)
@@ -141,65 +135,55 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     self.initializeGUI()
 
   def initializeGUI(self):
-    # get the paths saved in settings
-    # initailize the save directory using settings
+    ''' Initializes the GUI with the local settings saved in settings.ini '''
     settings = slicer.app.userSettings()
+    # initailize the save directory using settings
     if settings.value(self.logic.SAVE_LOCATION): # if the settings exists
       self.ui.saveDirectoryButton.directory = settings.value(self.logic.SAVE_LOCATION)
     # initailize the path to current model
     if settings.value(self.logic.MODEL_PATH):
       self.ui.modelFileSelector.setCurrentPath(settings.value(self.logic.MODEL_PATH))
-
-    # initialize the button states using parameter node
-    # if the parameter is not None, then set the button state to the value of the parameter
-    # if self._parameterNode.GetParameter(self.logic.PLOTTING_STATE) is not None:
-    #   # run button clicked function
-    #   self.setEnablePlotting(self._parameterNode.GetParameter(self.logic.PLOTTING_STATE))
-      
-    # if self._parameterNode.GetParameter(self.logic.CLASSIFYING_STATE) is not None:
-    #   self.ui.enableClassificationButton.checked = self._parameterNode.GetParameter(self.logic.CLASSIFYING_STATE)
-    
-    # # connect button
-    # if self._parameterNode.GetParameter(self.logic.CONNECTED) is not None:
-    #   self.ui.connectButton.checked = self._parameterNode.GetParameter(self.logic.CONNECTED)
-
-    # Initialize the savingFlag to False in the parameter node
+    # initialize the savingFlag to False in the parameter node
     self._parameterNode.SetParameter(self.logic.SAVING_STATE, "False")
 
-
-
   def initializeScene(self):
-        # NeedleModel
+    '''
+    Initializes the scene with the following nodes:
+    - NeedleModel
+    - NeedleTip pointlist
+    TODO 
+      -  change pointlist to a dictionary, this should add functionality and make it faster to access the points.
+      - Improve robustness to name changes of the nodes
+    '''
+    # If NeedleModel is not in the scene, create and add it
+    needleModel = slicer.util.getFirstNodeByName(self.logic.NEEDLE_MODEL)
+    if needleModel is None:
+        createModelsLogic = slicer.modules.createmodels.logic()
+        # creates a needle model with 4 arguments: Length, radius, tip radius, and DepthMarkers
+        needleModel = createModelsLogic.CreateNeedle(80,1.0,2.5, 0)
+        needleModel.SetName(self.logic.NEEDLE_MODEL)
+        # Add it to parameter node
+        self._parameterNode.SetNodeReferenceID(self.logic.NEEDLE_MODEL, needleModel.GetID())
 
-        # If NeedleModel is not in the scene, create and add it
-        needleModel = slicer.util.getFirstNodeByName(self.logic.NEEDLE_MODEL)
-        if needleModel is None:
-            createModelsLogic = slicer.modules.createmodels.logic()
-            # creates a needle model with 4 arguments: Length, radius, tip radius, and DepthMarkers
-            needleModel = createModelsLogic.CreateNeedle(80,1.0,2.5, 0)
-            needleModel.SetName(self.logic.NEEDLE_MODEL)
-            # Add it to parameter node
-            self._parameterNode.SetNodeReferenceID(self.logic.NEEDLE_MODEL, needleModel.GetID())
-        
-        # NeedleTip pointlist
+    # If pointList_NeedleTip is not in the scene, create and add it
+    pointList_EMT = self._parameterNode.GetNodeReference(self.logic.POINTLIST_EMT)
+    if pointList_EMT == None:
+        # Create a point list for the needle tip in reference coordinates
+        pointList_EMT = slicer.vtkMRMLMarkupsFiducialNode()
+        pointList_EMT.SetName("pointList_NeedleTip")
+        slicer.mrmlScene.AddNode(pointList_EMT)
+        # Set the role of the point list
+        self._parameterNode.SetNodeReferenceID(self.logic.POINTLIST_EMT, pointList_EMT.GetID())
     
-        # If pointList_NeedleTip is not in the scene, create and add it
-        pointList_EMT = self._parameterNode.GetNodeReference(self.logic.POINTLIST_EMT)
-        if pointList_EMT == None:
-            # Create a point list for the needle tip in reference coordinates
-            pointList_EMT = slicer.vtkMRMLMarkupsFiducialNode()
-            pointList_EMT.SetName("pointList_NeedleTip")
-            slicer.mrmlScene.AddNode(pointList_EMT)
-            # Set the role of the point list
-            self._parameterNode.SetNodeReferenceID(self.logic.POINTLIST_EMT, pointList_EMT.GetID())
-        # Add a point to the point list
-        if pointList_EMT.GetNumberOfControlPoints() == 0:
-            pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
-            pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
-        pass
+    # Add a point to the point list
+    if pointList_EMT.GetNumberOfControlPoints() == 0:
+        pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
+        pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
 
-  # My functions
+  # GUI functions
+
   def onContinuousCollectionButtonClicked(self):
+    ''' Updates text on continuous collection button, and toggles data collection when clicked '''
     # if the button is checked, start collecting data
     if self.ui.continuousCollectionButton.isChecked():
       self.ui.continuousCollectionButton.setText("Stop Collection")
@@ -208,34 +192,37 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     else:
       self.ui.continuousCollectionButton.setText("Start Continuous Collection")
       self.logic.stopDataCollection()
-
+  
   def onDataClassSelectorChanged(self):
+    ''' Updates the data class parameter in the parameter node'''
     self.updateParameterNodeFromGUI()
     parameterNode = self.logic.getParameterNode()
     dataClass = self.ui.dataClassSelector.currentText
     parameterNode.SetParameter(self.logic.DATA_CLASS, dataClass)
 
   def onPatientNumberSelectorChanged(self):
+    ''' Updates the patient number parameter in the parameter node'''
     self.updateParameterNodeFromGUI()
     parameterNode = self.logic.getParameterNode()
     patientNumber = self.ui.patientNumberSelector.currentText
     parameterNode.SetParameter(self.logic.PATIENT_NUM, patientNumber)
 
   def onSamplingDurationChanged(self):
+    ''' Updates the sampling duration parameter in the parameter node'''
     self.updateParameterNodeFromGUI()
     parameterNode = self.logic.getParameterNode()
-    # sampleDuration = self.ui.sampleDurationSelector.currentText
     sampleDuration = self.ui.samplingDurationSlider.value
     parameterNode.SetParameter(self.logic.SAMPLING_DURATION, str(sampleDuration))
 
   def onSamplingRateChanged(self):
+    ''' Updates the sampling rate parameter in the parameter node'''
     self.updateParameterNodeFromGUI()
     parameterNode = self.logic.getParameterNode()
-    # sampleRate = self.ui.samplePerSecondSelector.currentText
     sampleRate = self.ui.samplingRateSlider.value
     parameterNode.SetParameter(self.logic.SAMPLING_RATE, str(sampleRate))
 
   def onCollectSampleButtonClicked(self,enable):
+    ''' Initiates the collection of a data sample for a fixed duration'''
     self.updateParameterNodeFromGUI()
     # update the parameter node
     parameterNode = self.logic.getParameterNode()
@@ -248,11 +235,8 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     timer = qt.QTimer()
     timer.singleShot(float(sampleDuration)*1000+50, lambda: self.ui.collectSampleButton.setEnabled(True))
 
-
   def onConnectButtonClicked(self):
-    '''
-    This function creates the IGTL connection for the Spectrometer and the EMT 
-    '''
+    ''' Creates the IGTLink connection for the Spectrometer and the EMT '''
     self.updateParameterNodeFromGUI()
     # Get parameter node
     parameterNode = self.logic.getParameterNode()
@@ -294,8 +278,8 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         pointList_NeedleTip = parameterNode.GetNodeReference(self.logic.POINTLIST_EMT)
         pointList_NeedleTip.SetAndObserveTransformNodeID(transformNode.GetID())
 
-
   def onSaveDirectoryButtonClicked(self, directory):
+    ''' Updates the save directory parameter in the user settings '''
     # update settings with the new directory
     settings = slicer.app.userSettings()
     settings.setValue(self.logic.SAVE_LOCATION, directory)
@@ -303,12 +287,15 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     print('Save directory: ' + directory)
 
   def onSpectrumImageChanged(self):
+    ''' Updates the parameter node whenever the incoming spectrum changes'''
     self.updateParameterNodeFromGUI()
 
   def onOutputTableChanged(self):
+    ''' Updates the parameter node whenever the output table selection changes'''
     self.updateParameterNodeFromGUI()
 
   def onModelFileSelectorChanged(self, path):
+    ''' Updates the parameter node whenever the model file selector changes'''
     # update settings with the new model path
     settings = slicer.app.userSettings()
     settings.setValue(self.logic.MODEL_PATH, path)
@@ -317,10 +304,12 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       self.logic.model = load(path)
 
   def onPlaceFiducialButtonClicked(self):
+    ''' Initates the placement of a fiducial point'''
     self.updateParameterNodeFromGUI()
     self.logic.placeFiducial()
 
   def setEnablePlotting(self, enable):
+    ''' Initiates the spectrum viewer and toggles the button text'''
     self.updateParameterNodeFromGUI()
     if enable:
       # change the button text to 'Disable Plotting'
@@ -332,6 +321,7 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       self.logic.stopPlotting()
 
   def setEnableClassification(self, enable):
+    ''' Initiates the real-time classification and toggles the button text'''
     self.updateParameterNodeFromGUI()
     if enable:
       # change the button text to 'Disable Classification'
@@ -341,21 +331,26 @@ class BroadbandSpecModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
       self.ui.enableClassificationButton.text = 'Enable Classification'
 
   def onClearLastPointButtonClicked(self):
+    ''' 
+    Initiates removal of the last data point plotted
+    TODO - Implement this function after transitioning to a dictionary for the point lists
+    '''
     self.updateParameterNodeFromGUI()
     # Check to see if the lists exist, and if not create them
     print("This button is not currently implemented")
-    pass
 
   def onClearControlPointsButtonClicked(self):
+    ''' Initiates removal of all points visualized'''
     self.updateParameterNodeFromGUI()
     self.logic.clearControlPoints()
 
   def onAddControlPointButtonClicked(self):
+    ''' Initiates the addition of a new data point to the visualization'''
     self.updateParameterNodeFromGUI()
-    # Check to see if the lists exist, and if not create them
     self.logic.addControlPointToToolTip()
 
   def onScanButtonClicked(self, checked):
+    ''' Initiates the start of the scanning process'''
     self.updateParameterNodeFromGUI()
     if checked:
       self.logic.startScanning()
@@ -577,13 +572,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     """
     ScriptedLoadableModuleLogic.__init__(self)
     self.observerTags = [] # This is reset when the module is reloaded. But not all observers are removed.
-    # ###
     slicer.mymodLog = self
-    # path = "C:\Spectroscopy_TrackedTissueSensing\Models/"
-    # filename = "KNN_TestModel.joblib" 
-    # filename = "KNN_BlueVsWhite.joblib" 
-    # filename = "KNN_CardboardVsTeaBox.joblib" 
-    # self.model = load(path + filename)
     self.model = None
 
 #
@@ -597,46 +586,15 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     if not parameterNode.GetParameter(self.CLASSIFICATION):
       parameterNode.SetParameter(self.CLASSIFICATION, '')
 
-  def process(self, inputVolume, outputTable, imageThreshold, invert=False, showResult=True):
-    """
-    Run the processing algorithm.
-    Can be used without GUI widget.
-    :param inputVolume: volume to be thresholded
-    :param outputTable: thresholding result
-    :param imageThreshold: values above/below this threshold will be set to 0
-    :param invert: if True then values above the threshold will be set to 0, otherwise values below are set to 0
-    :param showResult: show output volume in slice viewers
-    """
-
-    if not inputVolume or not outputTable:
-      raise ValueError("Input or output volume is invalid")
-
-    import time
-    startTime = time.time()
-    logging.info('Processing started')
-
-    # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
-    cliParams = {
-      self.INPUT_VOLUME: inputVolume.GetID(),
-      self.OUTPUT_TABLE: outputTable.GetID(),
-      'ThresholdValue' : imageThreshold,
-      'ThresholdType' : 'Above' if invert else 'Below'
-      }
-    cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
-    # We don't need the CLI module node anymore, remove it to not clutter the scene with it
-    slicer.mrmlScene.RemoveNode(cliNode)
-
-    stopTime = time.time()
-    logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
-
   def addObservers(self):
+    ''' Adds observers to the scene '''
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     if spectrumImageNode:
-      # print("Add observer to {0}".format(spectrumImageNode.GetName()))
       self.observerTags.append([spectrumImageNode, spectrumImageNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onSpectrumImageNodeModified)])
 
   def removeObservers(self):
+    ''' Removes observers from the scene '''
     for nodeTagPair in self.observerTags:
       nodeTagPair[0].RemoveObserver(nodeTagPair[1])
 
@@ -645,6 +603,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
 # 
 
   def startDataCollection(self):
+    ''' Starts the process of recording spectral data into a sequence '''
     # Load in the parameters
     parameterNode = self.getParameterNode()
     sampleFrequency = parameterNode.GetParameter(self.SAMPLING_RATE)
@@ -672,9 +631,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     browserNode.SetPlaybackRateFps(float(sampleFrequency))
     # Start the recording
     browserNode.SetRecordingActive(True)
-    pass
 
   def stopDataCollection(self):
+    ''' Haults the data collection process and initiates the data saving process '''
     print('Stopping Collection')
     # Load in the parameters
     parameterNode = self.getParameterNode()
@@ -683,11 +642,10 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     browserNode.SetRecordingActive(False)
     # Save the sample to csv
     self.saveSample()
-    pass
 
   def placeFiducial(self):
     """
-    Place a fiducial at the tool tip.
+    Places a fiducial at the tool tip.
     """
     parameterNode = self.getParameterNode()
     pointListGreen_World = parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD)
@@ -699,10 +657,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     pointListGreen_World.AddControlPoint(tip_World)
     pointListGreen_World.SetNthControlPointLabel(pointListGreen_World.GetNumberOfControlPoints()-1, '')
 
-#
-#
-#
   def startPlotting(self):
+      ''' Starts plotting the spectrum data in the spectrum viewer'''
       print("Start plotting")
       # Change the layout to one that has a chart.
       ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
@@ -714,16 +670,15 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       self.onSpectrumImageNodeModified(0,0)
 
   def stopPlotting(self):
+    ''' Stops plotting and sets the view back to conventional '''
     print("Stopped plotting")
-    # Set layout to conventional widescreen
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
-    # ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalPlotView)
-    # ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUp3DView)
     # set view to conventional
     ln.SetViewArrangement(slicer.vtkMRMLLayoutNode.SlicerLayoutConventionalView)
     self.removeObservers()  
 
   def addControlPointToToolTip(self):
+    ''' Adds a control point to the point list at the tool tip location '''
     # Get the required nodes
     parameterNode = self.getParameterNode()
     pointListGreen_World = parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD)
@@ -734,7 +689,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     pos = [0,0,0]
     pointList_EMT.GetNthControlPointPositionWorld(0,pos)
     tip_World = pos
-    # print("Tip World: ", tip_World)
     # Add control point at tip of probe based on classification
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     # Convert image to volume 
@@ -748,12 +702,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       pointListGreen_World.AddControlPoint(tip_World)
       # set label of the control point to ''
       pointListGreen_World.SetNthControlPointLabel(pointListGreen_World.GetNumberOfControlPoints()-1, '')
-      # parameterNode.SetParameter('LastPointAdded', self.logic.CLASS_LABEL_0)
     elif spectrumLabel == self.CLASS_LABEL_1:
       pointListRed_World.AddControlPoint(tip_World)
       pointListRed_World.SetNthControlPointLabel(pointListRed_World.GetNumberOfControlPoints()-1, '')
-      # parameterNode.SetParameter('LastPointAdded', self.logic.CLASS_LABEL_1)
-    pass
 
   def clearControlPoints(self):
     """
@@ -762,7 +713,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # Check to see if the lists exist, and if not create them
     # self.setupLists()
     parameterNode = self.getParameterNode()
-    # *** this should be done from parameter node
     pointListGreen_World = parameterNode.GetNodeReference(self.POINTLIST_GREEN_WORLD)
     pointListRed_World = parameterNode.GetNodeReference(self.POINTLIST_RED_WORLD)
     pointListGreen_World.RemoveAllMarkups()
@@ -771,37 +721,22 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
   def startScanning(self):
     # This is currently handled directly in onSpectrumImageNodeModified using a flag
     print('Scanning')
-    pass
 
   def stopScanning(self):
     # This is currently handled directly in onSpectrumImageNodeModified using a flag
     print('Stopping Scanning')
-    pass
 
 #
 # Data Collection
 #
   def recordSample(self):
-    '''
-    This function will record an N second sample of spectral data, it then calls saveSample to save the data to a csv file.
-
-    NOTE:
-    There is a browser and a sequence
-    SetPlayback
-    SetRecordingActive  
-    The goal is to create a a sequencec of spectra using the sequence browser over 1 section and then save it to a csv
-    self = slicer.mymodLog
-    parameterNode = self.getParameterNode()
-    seqBrowserNode.RemoveAllProxyNodes()
-    image.EndModify(0) # when the second seq is created I think it modifys the first and then the second is ended. When things stop modifying call this. 
-    '''
+    ''' This function will record an N second sample of spectral data, it then calls saveSample to save the data to a csv file '''
     # Load in the parameters
     parameterNode = self.getParameterNode()
     sampleDuration = parameterNode.GetParameter(self.SAMPLING_DURATION)
     sampleFrequency = parameterNode.GetParameter(self.SAMPLING_RATE)
     image_imageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     browserNode = parameterNode.GetNodeReference(self.SAMPLE_SEQ_BROWSER)
-    # Print Collecting sample and the data collection parameters
     
     if browserNode == None:
       browserNode = slicer.vtkMRMLSequenceBrowserNode()
@@ -822,23 +757,15 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     browserNode.SetPlaybackRateFps(float(sampleFrequency))
     # Start the recording
     browserNode.SetRecordingActive(True)
-    # print('Collecting sample')
     self.timer = qt.QTimer()
     # NOTE: singleShot will proceed with the next lines of code before the timer is done
     # Call a singleShot to stop the recording after the sample duration
     self.timer.singleShot(float(sampleDuration)*1000, lambda: browserNode.SetRecordingActive(False))
-    # self.timer.connect('timeout()', self.saveSample)
-    
     # Save the sample slightly after the recording is stopped
     self.timer.singleShot(float(sampleDuration)*1000+50, lambda: self.saveSample())
 
-    # Get the remaining time in the timer
-    # self.timer.remainingTime()
-
   def saveSample(self):
-    '''
-    Saves the data stored in the SampleSequenceBrowse to a single csv file
-    '''
+    ''' Saves the data stored in the SampleSequenceBrowse to a single csv file '''
     # get parameters
     parameterNode = self.getParameterNode()
     dataLabel = parameterNode.GetParameter(self.DATA_CLASS)
@@ -852,9 +779,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     # get the number of files in the folder aleady
     # Check to see if any data has been recorded
     if sequenceLength == 0:
-      print("No data to save")
-      # update SAVING_STATE to false
-      # parameterNode.SetParameter(self.SAVING_STATE, 'False')
+      print("No data to save (Preloaded sequences do not work)")
       return
 
     # Format the empty array
@@ -900,8 +825,11 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
 # Processing functions
 #
 
-
   def onSpectrumImageNodeModified(self, observer, eventid):
+    ''' 
+    This function is called whenever the spectrum image is modified. 
+    It handles much of the real-time processing and plotting.
+    '''
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
     outputTableNode = parameterNode.GetNodeReference(self.OUTPUT_TABLE)
@@ -929,9 +857,7 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       # if the red and green point lists are both empty
       if pointListRed_World.GetNumberOfControlPoints() == 0 and pointListGreen_World.GetNumberOfControlPoints() == 0:
         self.addControlPointToToolTip()
-        pass
-      # Else check the distance beween the last control point and the tip of the probe
-      else:
+      else: # else check the distance beween the last control point and the tip of the probe
         # The the tip of the probe in world coordinates
         pos = [0,0,0]
         pointList_EMT = parameterNode.GetNodeReference(self.POINTLIST_EMT)
@@ -951,10 +877,8 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
         distanceRed = np.linalg.norm(np.subtract(tip_World, lastPointGreen_World))
         distanceGreen = np.linalg.norm(np.subtract(tip_World, lastPointRed_World))
         # If both distances are greater than the threshold, add a new control point
-        # print("Distance Red: {0}".format(distanceRed))
         if distanceRed > self.DISTANCE_THRESHOLD and distanceGreen > self.DISTANCE_THRESHOLD:
           self.addControlPointToToolTip()
-          pass
  
   def setupLists(self):
       '''
@@ -985,25 +909,9 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
         pointListRed_World.GetDisplayNode().SetSelectedColor(1,0,0)
         # Set the role of the point list
         parameterNode.SetNodeReferenceID(self.POINTLIST_RED_WORLD, pointListRed_World.GetID())
-
-      # # Check to see if role pointList_EMT is present
-      # if parameterNode.GetNodeReference(self.POINTLIST_EMT) == None:
-      #   # Create a point list for the endoscope tip in reference coordinates
-      #   pointList_EMT = slicer.vtkMRMLMarkupsFiducialNode()
-      #   pointList_EMT.SetName("pointList_EMT")
-      #   slicer.mrmlScene.AddNode(pointList_EMT)
-      #   # Set the role of the point list
-      #   parameterNode.SetNodeReferenceID(self.POINTLIST_EMT, pointList_EMT.GetID())
-
-      # # If the point list for EMT is empty, add a point to the origin
-      # pointList_EMT = parameterNode.GetNodeReference(self.POINTLIST_EMT)
-      # if pointList_EMT.GetNumberOfControlPoints() == 0:
-      #   pointList_EMT.AddControlPoint(np.array([0, 0, 0]))
-      #   pointList_EMT.SetNthControlPointLabel(0, "origin_Tip")
-      # # move pointList_EMT to the ProbeTiptoProbe transform
-      pass
   
   def updateOutputTable(self):
+    '''Handles formating the input spectum for display in the output table'''
     # Get the table created by the selector
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
@@ -1028,14 +936,12 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
       # Name the table
       tableNode.SetName("OutputTable")
       parameterNode.SetNodeReferenceID(self.OUTPUT_TABLE, tableNode.GetID())
-    # if slicer.util.getNodesByClass('vtkMRMLTableNode') == []: # ***
-    #   tableNode=slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTableNode")
     slicer.util.updateTableFromArray(tableNode,specArray,["Wavelength","Intensity"])
 
     return specArray # *** Instead of returning the array, should I just save it to the parameter node?
     
   def updateChart(self):
-    ''' Update the display chart using the the given spectra and classification '''
+    ''' Update the display chart using output table and classification prediction '''
     # specPred, specLabel = self.classifySpectra(specArray[743:-1,:]) 
     parameterNode = self.getParameterNode()
     spectrumImageNode = parameterNode.GetNodeReference(self.INPUT_VOLUME)
@@ -1048,7 +954,6 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     if plotSeriesNode == None:
       plotSeriesNode = slicer.vtkMRMLPlotSeriesNode()
       slicer.mrmlScene.AddNode(plotSeriesNode)
-      #plotSeriesNode.SetName(spectrumImageNode.GetName() + " plot")
       plotSeriesNode.SetName("Measured Spectrum")
       parameterNode.SetNodeReferenceID(self.OUTPUT_SERIES, plotSeriesNode.GetID())
       plotSeriesNode.SetAndObserveTableNodeID(tableNode.GetID())
@@ -1075,19 +980,10 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     slicer.modules.plots.logic().ShowChartInLayout(plotChartNode)
 
   def classifySpectra(self,X_test):
+    ''' Classifies the spectra using the trained model, returns the predictions and text label '''
     # Get the max value in X_test to see if we will classify or not
     max_value = np.amax(X_test[:,1])
-    # # Subtract the baseline from the data
-    # path = 'C:/Spectroscopy_TrackedTissueSensing/raw_data/'
-    # file_name = 'white_baseline.csv'
-    # baseline_pap = IO.loadSpectrum(path, file_name, 'Wavelength', start_index=774)
-    # baseline = baseline_pap[:-1,:]
-    # baseline = process.normalize(baseline)[:,1] 
-    
-    # X_test = process.normalize(X_test)
-    # X_test[:,1] = X_test[:,1] - baseline
-
-    X_test = process.normalize(X_test)
+    X_test = self.normalize(X_test)
     X_test = X_test[:,1].reshape(1,-1)
     predicted = self.model.predict(X_test)
     # To ensure a strong, unsaturated signal
@@ -1101,6 +997,20 @@ class BroadbandSpecModuleLogic(ScriptedLoadableModuleLogic,VTKObservationMixin):
     parameterNode = self.getParameterNode()
     parameterNode.SetParameter(self.CLASSIFICATION, label)
     return predicted, label
+  
+  def normalize(data):
+      ''' Normalizes the data to a range of 0 to 1 '''
+      temp = data.copy()
+      if len(temp.shape) == 2:
+          temp[:,1] = (temp[:,1] - min(temp[:,1]))
+          temp[:,1] = temp[:,1]/max(temp[:,1])
+      elif len(temp.shape) == 3:
+          for i in range(len(temp)):
+              temp[i,:,1] = (temp[i,:,1] - min(temp[i,:,1]))
+              temp[i,:,1] = temp[i,:,1]/max(temp[i,:,1])
+      else:
+          print('Error, array dimension is not 2 or 3')     
+      return temp
   
 #
 # BroadbandSpecModuleTest
@@ -1123,52 +1033,4 @@ class BroadbandSpecModuleTest(ScriptedLoadableModuleTest):
     """
     self.setUp()
     # Tell user test is not implemented
-    print("WARNING: No automated tests implemented for this module")
-    # self.test_BroadbandSpecModule1()
-
-  def test_BroadbandSpecModule1(self):
-    """ Ideally you should have several levels of tests.  At the lowest level
-    tests should exercise the functionality of the logic with different inputs
-    (both valid and invalid).  At higher levels your tests should emulate the
-    way the user would interact with your code and confirm that it still works
-    the way you intended.
-    One of the most important features of the tests is that it should alert other
-    developers when their changes will have an impact on the behavior of your
-    module.  For example, if a developer removes a feature that you depend on,
-    your test should break so they know that the feature is needed.
-    """
-
-    # self.delayDisplay("Starting the test")
-
-    # # Get/create input data
-
-    # import SampleData
-    # registerSampleData()
-    # inputVolume = SampleData.downloadSample('BroadbandSpecModule1')
-    # self.delayDisplay('Loaded test data set')
-
-    # inputScalarRange = inputVolume.GetImageData().GetScalarRange()
-    # self.assertEqual(inputScalarRange[0], 0)
-    # self.assertEqual(inputScalarRange[1], 695)
-
-    # outputVolume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
-    # threshold = 100
-
-    # # Test the module logic
-
-    # logic = BroadbandSpecModuleLogic()
-
-    # # Test algorithm with non-inverted threshold
-    # logic.process(inputVolume, outputVolume, threshold, True)
-    # outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-    # self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-    # self.assertEqual(outputScalarRange[1], threshold)
-
-    # # Test algorithm with inverted threshold
-    # logic.process(inputVolume, outputVolume, threshold, False)
-    # outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-    # self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-    # self.assertEqual(outputScalarRange[1], inputScalarRange[1])
-
-    # self.delayDisplay('Test passed')
-    pass
+    print("WARNING: No automated tests implemented for this module yet")
