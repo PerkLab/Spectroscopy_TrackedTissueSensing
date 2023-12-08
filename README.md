@@ -26,8 +26,32 @@ This codebase contains:
 For more detailed information please see chapter __ to __ of the thesis document
 
 
-### Step by step guide of how to operate the module
-
+### Step-by-step guide on how to setup and operate the testbed
+See folder SOP, file How-To-Guide fore more detailed information
+- **Hardware**
+  - Ensure all hardware elements are connected to the PC and turned on. This includes the spectrometer and tracker, but not the light source.
+- **PLUS**
+  - Select the config file from the PLUS-config-files folder in this repo (Config file is editable to change default data collection parameters. See http://perk-software.cs.queensu.ca/plus/doc/nightly/user/DeviceThorLabs.html . NOTE: Speak to kyle if they are not working.)
+- **Slicer**
+  - Load in a scene before opening (the module (if desired - the module will populate a blank scene)
+  - Open module: Spectroscopy -> Navigate Tissue Sensing
+- **Module**
+  - **Setup tab**: Used to get the module connected to the hardware
+    - Connect button (uses openIGTLink to connect to the PLUS application)
+    - Input volume and output table should be automatically selected
+  - Enable plotting will enable the spectrum viewer to visualize the input spectrum
+  - Enable classification will feed the input spectrum into the ML classifier for prediction.
+  - **Data collection tab**: Used to create a dataset for training an ML classifier
+    - Select the save folder for the dataset
+    - Input the class label you are scanning (eg: Cancer)
+    - Input the Patient ID (eg: PatientA)
+    - Add extra metadata to Patient ID if required (PatientA_Sample1_front)
+    - Select sampling duration (The module will record for N seconds, and save this as a single csv.)
+    - Single sample collection (will record for specified duration)
+    - Continuous sample collection (will record until toggled off)
+  - **Inference tab**: Used once a model is trained to create a 3D classification map of a tissue surface
+    - Select a pretrained classifier (inputed as a .joblib)
+    
 
 ### Resources
 *Data*
