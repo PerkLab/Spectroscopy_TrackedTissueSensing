@@ -1,4 +1,4 @@
-# Navigated tissue sensing module: Broadband optical spectroscopy, electromagnetic tracking, and machine learning for tissue classification
+# Navigated tissue sensing module
 
 ### Summary
 This repo is where all of the code is stored for the project titled "*Development of a research testbed for intraoperative optical spectroscopy tumour margin assessment*" completed by David Morton 2021-2023. 
