@@ -51,6 +51,8 @@ See folder SOP, file How-To-Guide fore more detailed information
     - Continuous sample collection (will record until toggled off)
   - **Inference tab**: Used once a model is trained to create a 3D classification map of a tissue surface
     - Select a pretrained classifier (inputed as a .joblib)
+    - Ensure classification is enabled above
+    - slowly move probe around a surface (about 5mm away)
     
 
 ### Resources
