@@ -27,7 +27,7 @@ For more detailed information please see chapter __ to __ of the thesis document
 
 
 ### Step-by-step guide on how to setup and operate the testbed
-See folder SOP, file How-To-Guide fore more detailed information
+See folder SOP, file How-To-Guide for more detailed information
 - **Hardware**
   - Ensure all hardware elements are connected to the PC and turned on. This includes the spectrometer and tracker, but not the light source.
 - **PLUS**
@@ -63,7 +63,7 @@ See folder SOP, file How-To-Guide fore more detailed information
 - PLUS version: PlusApp-2.9.0.20230118-ThorLabs-Win32
 - 3D Slicer version: 5.2.1
 
-*Extensions*
+*3D Slicer Extensions*
 - DebuggingTools: 25d65a5 (2022-11-24)
 - MarkupsToModel: 835453f (2022-11-24)
 - SlicerIGSIO: 78d65fe (2022-12-11)
